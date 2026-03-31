@@ -12,3 +12,22 @@
 - Refactored exchange selector UX: removed refresh button, switched to automatic forced load on access, no "Exchange:" label line break, and added dedicated sidebar variant styling.
 - Reduced outer wrapper padding on dashboard root to prevent double-wrapping/outer-spacing issues.
 - Updated `npm test` to kill previous process on port `3001` and enforce a 90-second timeout.
+- Removed duplicate route-group pages under `app/(main)` to avoid Next.js traced-file copy failures for `page_client-reference-manifest.js` during standalone/deployment builds.
+- Fixed React runtime crash (`Minified React error #321`) by removing invalid hook calls inside `useEffect` in live-trading/strategies/indications pages and subscribing via hooks at top level.
+- Hardened SSE hook behavior to safely skip empty connection IDs and correctly recreate client subscriptions per connection change.
+- Adjusted shell/header spacing with light paddings and non-overflowing trigger placement to keep menu-button/title alignment stable across pages.
+- Updated top-layer style to align with reference layout pattern (header-level `SidebarTrigger` + separator), removing shell-overlay trigger so header/title/menu alignment is consistent across pages using `PageHeader`.
+- Fixed appearance switching effectiveness by mounting `StyleInitializer` globally and adding concrete CSS theme/style variant rules in `app/globals.css` so theme/style toggles visibly affect UI.
+- Removed the top Global Trade Coordinator info box from the main dashboard as requested.
+- Improved monitoring/services/modules status reliability by normalizing boolean-like API payload values (`"true"/"false"`, `"online"/"offline"`, `1/0`) before rendering status badges.
+- Re-enabled trade-engine synchronization in `trade-engine-auto-start` monitor by invoking coordinator `refreshEngines()` whenever global state is running (recovers missed toggles/restarts).
+- Expanded `/api/trade-engine/diagnostic` with runtime/global-state/data-coverage details (market data, prehistoric, engine-state keys, coordinator active engines) for deeper engine troubleshooting.
+- Fixed `/api/trade-engine/functional-overview` to use assigned+enabled connection filtering and robustly parse strategy-set counts from both `strategies:*` and `strategy_set:*` key formats.
+- Enforced hierarchy outputs for strategy/pseudo summaries in detailed logs (`base` much higher than `main`, `real` below `main`) and exposed raw counts for debugging.
+- Updated strategy set defaults and thresholds so Base produces substantially more candidates than Main, while Real remains the strictest/lowest volume tier.
+
+- Added backward-compatible `PUT` handler alias for `/api/settings/connections/{id}/toggle-dashboard` so legacy clients no longer fail with 405 when enabling/disabling processing.
+- Corrected complete-workflow API documentation to list `POST /api/settings/connections/{id}/toggle-dashboard` as the canonical toggle endpoint.
+- Added high-performance sync-range coordination in `DataSyncManager` with merged coverage intervals and true missing-range detection, enabling partial backfills instead of full reloads.
+- Updated symbol data loading to fetch/store only missing market-data ranges, append range metadata, and keep incremental sync logs for faster repeated runs.
+- Integrated preset historical loading with batched symbol coordination, `DataSyncManager` range checks, per-range sync logging, and progression events for large-scale backfill visibility.
