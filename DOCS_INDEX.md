@@ -213,7 +213,7 @@ For testing and problem-solving:
 ## Common Questions
 
 ### Q: Where is the dashboard?
-**A**: Navigate to `http://localhost:3000/dashboard-modern` or just `http://localhost:3000` (redirects automatically)
+**A**: Navigate to `http://localhost:3000/main` or just `http://localhost:3000` (redirects automatically)
 
 ### Q: How do I configure trading?
 **A**: See **DASHBOARD_USER_GUIDE.md** - Configuration sections

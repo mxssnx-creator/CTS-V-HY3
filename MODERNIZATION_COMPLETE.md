@@ -126,7 +126,7 @@ All components accept real data through props and callbacks:
 ### View the Modern Dashboard
 Open your browser and navigate to:
 ```
-http://localhost:3000/dashboard-modern
+http://localhost:3000/main
 ```
 
 Or the main page will automatically redirect:

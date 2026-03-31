@@ -59,7 +59,7 @@ The logistics model is coordinated via the shared workflow snapshot:
 Primary logistics/status surfaces:
 
 - `GET /api/logistics/queue`
-- `GET /api/dashboard/system-stats-v3`
+- `GET /api/main/system-stats-v3`
 - `GET /api/tracking/overview`
 - `GET /api/connections/progression/{id}`
 

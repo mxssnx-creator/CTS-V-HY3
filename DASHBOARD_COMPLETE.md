@@ -154,7 +154,7 @@ Created comprehensive documentation:
 
 ### Access the Dashboard
 ```
-http://localhost:3000/dashboard-modern
+http://localhost:3000/main
 ```
 
 ### Main Features

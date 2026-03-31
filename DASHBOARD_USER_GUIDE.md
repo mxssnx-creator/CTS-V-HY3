@@ -5,7 +5,7 @@
 ### Access the Dashboard
 Open your browser and navigate to:
 ```
-http://localhost:3000/dashboard-modern
+http://localhost:3000/main
 ```
 
 The main homepage (`/`) will automatically redirect you to the modern dashboard.
@@ -231,7 +231,7 @@ The top section shows real-time metrics:
 
 1. **Access Dashboard**
    ```
-   http://localhost:3000/dashboard-modern
+   http://localhost:3000/main
    ```
 
 2. **Review System Status**

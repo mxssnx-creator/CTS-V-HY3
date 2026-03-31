@@ -1,9 +1,9 @@
-# Dashboard Layout Overview & Visual Guide
+# Main Page Layout Overview & Visual Guide
 
-## Complete Dashboard Layout Structure
+## Complete Main Page Layout Structure
 
 ```
-┌─ Main Dashboard Page ────────────────────────────────────────────────┐
+┌─ Main Page ────────────────────────────────────────────────┐
 │                                                                      │
 │  ┌─ Global Coordinator Status ──────────────────────────────────┐   │
 │  │ ✓ Status: Running/Paused/Stopped                             │   │

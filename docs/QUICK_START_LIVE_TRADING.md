@@ -10,7 +10,7 @@ Your system is **100% complete** and ready for live trading. All 11 predefined e
 
 Open your browser and navigate to:
 ```
-http://localhost:3000/dashboard
+http://localhost:3000/main
 ```
 
 You should see:
@@ -100,7 +100,7 @@ Real-time stats available at:
 ```
 http://localhost:3000/api/monitoring/stats
 http://localhost:3000/api/trade-engine/status
-http://localhost:3000/dashboard (UI)
+http://localhost:3000/main (UI)
 ```
 
 ---
