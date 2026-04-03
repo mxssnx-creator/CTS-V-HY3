@@ -121,7 +121,7 @@ async function runBenchmarks() {
   const testString = 'BTCUSDT_1m_' + 'x'.repeat(100)
 
   const stringConcat = benchmark('String Concat', 'concatenate', () => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+     
     'prefix_' + testString + '_suffix'
   }, 10000)
   console.log(
@@ -129,7 +129,7 @@ async function runBenchmarks() {
   )
 
   const templateLiteral = benchmark('Template Literal', 'template string', () => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+     
     `prefix_${testString}_suffix`
   }, 10000)
   console.log(
