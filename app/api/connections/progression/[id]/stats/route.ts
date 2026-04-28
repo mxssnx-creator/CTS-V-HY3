@@ -147,13 +147,17 @@ export async function GET(
         if (Array.isArray(parsed)) symbolsFromArray = parsed.length
       } catch { /* ignore */ }
     }
-    const historicSymbolsTotal = Math.max(
-      historicSymbolsProcessed,
-      n(prehistoricHash.symbols_total),
-      n(es.config_set_symbols_total),
-      symbolsFromArray,
-      1
-    )
+    // Use a SINGLE authoritative source for symbolsTotal:
+    //   1. prehistoricHash.symbols_total (written by Quickstart + engine) - PRIMARY
+    //   2. symbolsFromArray (from engineState.symbols or active_symbols) - SECONDARY
+    //   3. historicSymbolsProcessed (actual processed count) - TERTIARY
+    // Remove Math.max() which causes flapping between different values.
+    const historicSymbolsTotal =
+      n(prehistoricHash.symbols_total) ||
+      symbolsFromArray ||
+      historicSymbolsProcessed ||
+      n(es.config_set_symbols_total) ||
+      1  // Last resort fallback
     const historicCandlesLoaded = pick(
       n(prehistoricHash.candles_loaded),
       n(progHash.prehistoric_candles_processed),
@@ -172,6 +176,7 @@ export async function GET(
       progHash.prehistoric_phase_active === "false" && historicSymbolsProcessed > 0 ||
       es.prehistoric_data_loaded === true ||
       es.prehistoric_data_loaded === "1"
+    // Progress = (processed / total) * 100, capped at 99% until complete
     const historicProgressPercent = historicIsComplete
       ? 100
       : historicSymbolsTotal > 0
