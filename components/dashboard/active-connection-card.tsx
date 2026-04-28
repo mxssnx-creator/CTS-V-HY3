@@ -1307,12 +1307,12 @@ export function ActiveConnectionCard({
                                 </div>
                               )}
                               {/* Live-tier exclusive sub-row: realised ROI, win-rate, total PnL */}
-                              {isLive && (
-                                <div className="flex items-center gap-2 text-[10px] pl-7">
-                                  <span className="text-muted-foreground">ROI avg</span>
-                                  <span className={`font-medium tabular-nums ${avgPosEval > 0 ? "text-green-600 dark:text-green-400" : avgPosEval < 0 ? "text-red-500" : "text-foreground"}`}>
-                                    {avgPosEval !== 0 ? `${(avgPosEval * 100).toFixed(2)}%` : "—"}
-                                  </span>
+                               {isLive && (
+                                 <div className="flex items-center gap-2 text-[10px] pl-7">
+                                   <span className="text-muted-foreground">ROI avg</span>
+                                   <span className={`font-medium tabular-nums ${(avgPosEval ?? 0) > 0 ? "text-green-600 dark:text-green-400" : (avgPosEval ?? 0) < 0 ? "text-red-500" : "text-foreground"}`}>
+                                     {avgPosEval !== 0 && avgPosEval !== null ? `${(avgPosEval! * 100).toFixed(2)}%` : "—"}
+                                   </span>
                                   <span className="text-muted-foreground">
                                     WR <span className={`font-medium ${prehistoricStats.liveWinRate >= 60 ? "text-green-600 dark:text-green-400" : prehistoricStats.liveWinRate >= 40 ? "text-amber-600 dark:text-amber-400" : "text-red-500"}`}>
                                       {prehistoricStats.liveWinRate > 0 ? `${prehistoricStats.liveWinRate.toFixed(1)}%` : "—"}

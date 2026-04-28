@@ -84,29 +84,32 @@ export async function GET(request: NextRequest) {
       // non-critical
     }
 
-    return NextResponse.json({
-      activeConnections: activeConnections.length,
-      totalConnections: connections.length,
-      totalPositions,
-      openPositions,
-      totalTrades,
-      dailyPnL: Number(dailyPnL.toFixed(2)),
-      unrealizedPnL: Number(unrealizedPnL.toFixed(2)),
-      totalBalance: Number((dailyPnL + unrealizedPnL).toFixed(2)),
-      statistics: {
-        ...stats,
-        totalCycles,
-        totalIndications,
-        totalStrategies,
-        avgCycleDuration: stats?.avgCycleDuration || 0,
-        winRate250: stats?.winRate250 || 0.5,
-        profitFactor250: stats?.profitFactor250 || 1.0,
-        winRate50: stats?.winRate50 || 0.5,
-        profitFactor50: stats?.profitFactor50 || 1.0,
-        uptime: stats?.uptime || (totalCycles > 0 ? `${totalCycles} cycles` : "Starting..."),
-      },
-      timestamp: new Date().toISOString(),
-    })
+      return NextResponse.json({
+        activeConnections: activeConnections.length,
+        totalConnections: connections.length,
+        totalPositions,
+        openPositions,
+        totalTrades,
+        dailyPnL: Number(dailyPnL.toFixed(2)),
+        unrealizedPnL: Number(unrealizedPnL.toFixed(2)),
+        totalBalance: Number((dailyPnL + unrealizedPnL).toFixed(2)),
+        statistics: {
+          connections: stats?.connections || 0,
+          trades: stats?.trades || 0,
+          positions: stats?.positions || 0,
+          timestamp: stats?.timestamp || Date.now(),
+          totalCycles,
+          totalIndications,
+          totalStrategies,
+          avgCycleDuration: (stats as any)?.avgCycleDuration || 0,
+          winRate250: (stats as any)?.winRate250 || 0.5,
+          profitFactor250: (stats as any)?.profitFactor250 || 1.0,
+          winRate50: (stats as any)?.winRate50 || 0.5,
+          profitFactor50: (stats as any)?.profitFactor50 || 1.0,
+          uptime: (stats as any)?.uptime || (totalCycles > 0 ? `${totalCycles} cycles` : "Starting..."),
+        },
+        timestamp: new Date().toISOString(),
+      })
   } catch (error) {
     console.error("[v0] Error fetching monitoring stats:", error)
     return NextResponse.json(

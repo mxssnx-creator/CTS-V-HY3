@@ -83,10 +83,11 @@ interface Settings {
   realProfitFactor: number
   trailingStopLoss: boolean
   maxDrawdownTimeHours: number
-  mainEngineIntervalMs: number
-  presetEngineIntervalMs: number
-  activeOrderHandlingIntervalMs: number
-  databaseSizeBase: number
+   mainEngineIntervalMs: number
+   presetEngineIntervalMs: number
+   activeOrderHandlingIntervalMs: number
+   cyclePauseMs: number // 10-200ms, step 10, default 50ms — pause between engine cycles
+   databaseSizeBase: number
   databaseSizeMain: number
   databaseSizeReal: number
   databaseSizePreset: number
@@ -359,7 +360,6 @@ const initialSettings: Settings = {
   negativeChangePercent: 20, // 5-30 step 5, Default 20 - used for loss trigger calculation
   leveragePercentage: 100, // 5-100 step 5, Default 100
   prehistoricDataDays: 5,
-  prehistoric_range_hours: 8, // 1-50h, step 1, default 8
   marketTimeframe: 1,
   tradeIntervalSeconds: 1,
   realPositionsIntervalSeconds: 0.3,
@@ -420,6 +420,7 @@ const initialSettings: Settings = {
   mainEngineIntervalMs: 100, // 50-1000ms, step 50, default 200ms
   presetEngineIntervalMs: 100, // 50-1000ms, step 50, default 200ms
   activeOrderHandlingIntervalMs: 50, // 50-1000ms, step 50, default 50ms
+  cyclePauseMs: 50, // 10-200ms, step 10, default 50ms — pause between engine cycles
 
   // Database Size Configuration (range: 50-750, step 50, default 250)
   databaseSizeBase: 250,
@@ -437,8 +438,7 @@ const initialSettings: Settings = {
   maxPositionsShort: 1, // Max 1 short position per configuration
     indicationTimeoutMs: 1000, // 100ms to 3000ms, step 100ms, default 1000ms
     maxConcurrentOperations: 100, // 10-250, default 100
-    cyclePauseMs: 50, // 10-200ms, step 10, default 50ms — pause between engine cycles
-    prehistoric_range_hours: 8, // 1-50h, step 1, default 8h — look-back window for prehistoric calc
+    prehistoric_range_hours: 8, // 1-50h, step 1, default 8
 
   // System Configuration
   autoRestartOnErrors: true,

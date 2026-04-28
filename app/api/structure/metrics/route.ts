@@ -16,38 +16,54 @@ export async function GET(request: NextRequest) {
     const dbType = getDatabaseType()
     const isSQLite = dbType === "sqlite"
 
+    interface MetricsResult {
+      active_connections?: number
+      total_indications?: number
+      active_indications?: number
+      total_strategies?: number
+      active_strategies?: number
+      total_positions?: number
+      active_positions?: number
+      active_symbols?: number
+      total_volume_24h?: number
+      trades_per_hour?: number
+      base_positions?: number
+      main_positions?: number
+      real_positions?: number
+    }
+
     // Per-connection metrics derived from Redis — works regardless of SQL shim.
     const perConnection = isScoped
       ? await (async () => {
-          const [indications, strategies, positions] = await Promise.all([
-            getActiveIndications(connectionId!).catch(() => []),
-            getActiveStrategies(connectionId!).catch(() => []),
-            getAllPositions(connectionId!).catch(() => []),
-          ])
-          const activePositions = (positions as any[]).filter(
-            (p: any) => p?.status === "open" || p?.status === "active",
-          )
-          const activeSymbols = new Set(activePositions.map((p: any) => p.symbol).filter(Boolean)).size
-          return {
-            active_connections: 1,
-            total_indications: indications.length,
-            active_indications: indications.length,
-            total_strategies: strategies.length,
-            active_strategies: strategies.length,
-            total_positions: positions.length,
-            active_positions: activePositions.length,
-            active_symbols: activeSymbols,
-            total_volume_24h: activePositions.reduce(
-              (sum: number, p: any) => sum + (Number(p.entry_price) || 0) * (Number(p.quantity) || 0),
-              0,
-            ),
-            trades_per_hour: 0,
-          }
-        })()
+            const [indications, strategies, positions] = await Promise.all([
+              getActiveIndications(connectionId!).catch(() => []),
+              getActiveStrategies(connectionId!).catch(() => []),
+              getAllPositions(connectionId!).catch(() => []),
+            ])
+            const activePositions = (positions as any[]).filter(
+              (p: any) => p?.status === "open" || p?.status === "active",
+            )
+            const activeSymbols = new Set(activePositions.map((p: any) => p.symbol).filter(Boolean)).size
+
+            return {
+              active_connections: 1,
+              total_indications: indications.length,
+              active_indications: indications.length,
+              total_strategies: strategies.length,
+              active_strategies: strategies.length,
+              total_positions: positions.length,
+              active_positions: activePositions.length,
+              active_symbols: activeSymbols,
+              total_volume_24h: activePositions.reduce(
+                (sum: number, p: any) => sum + (Number(p.entry_price) || 0) * (Number(p.quantity) || 0),
+                0,
+              ),
+              trades_per_hour: 0,
+            }
+          })()
       : null
 
-    const result =
-      perConnection ||
+    const queryResult = perConnection ||
       (await queryOne(`
       SELECT 
         COUNT(DISTINCT ec.id) as active_connections,
@@ -69,6 +85,8 @@ export async function GET(request: NextRequest) {
       LEFT JOIN preset_strategies ps ON ps.connection_id = ec.id
       WHERE ec.${isSQLite ? "is_enabled = 1" : "is_enabled = true"}
     `))
+
+    const result: MetricsResult = (queryResult as MetricsResult) || {}
 
     // Note: pseudo_positions table doesn't have a 'type' column in the current schema
     // Using indication_type as a proxy for categorization
@@ -156,18 +174,18 @@ export async function GET(request: NextRequest) {
           cpu_usage: Math.round(cpuUsage),
           memory_usage: Math.round((memoryUsage.heapUsed / Math.max(memoryUsage.heapTotal, 1)) * 100),
           database_size: 45,
-          database_connections: Number.parseInt(metrics.active_connections) || 0,
+          database_connections: metrics?.active_connections ?? 0,
           api_requests_per_minute: 0,
-          websocket_connections: Number.parseInt(metrics.active_connections) || 0,
+          websocket_connections: metrics?.active_connections ?? 0,
           uptime_hours: 0,
         },
         tradingLogistics: {
-          active_connections: Number.parseInt(metrics.active_connections) || 0,
-          total_strategies: Number.parseInt(metrics.total_strategies) || 0,
-          active_strategies: Number.parseInt(metrics.active_strategies) || 0,
-          open_positions: Number.parseInt(metrics.active_positions) || 0,
-          total_volume_24h: Number.parseFloat(metrics.total_volume_24h) || 0,
-          trades_per_hour: Number.parseInt(metrics.trades_per_hour) || 0,
+          active_connections: metrics?.active_connections ?? 0,
+          total_strategies: metrics?.total_strategies ?? 0,
+          active_strategies: metrics?.active_strategies ?? 0,
+          open_positions: metrics?.active_positions ?? 0,
+          total_volume_24h: metrics?.total_volume_24h ?? 0,
+          trades_per_hour: metrics?.trades_per_hour ?? 0,
           avg_response_time: logistics?.avgLatency || 0,
           workflow_health: logistics?.workflowHealth || "unknown",
           queue_backlog: logistics?.queueBacklog || 0,
@@ -175,22 +193,22 @@ export async function GET(request: NextRequest) {
           success_rate: logistics?.successRate || 0,
         },
         rawMetrics: {
-          activeConnections: Number.parseInt(metrics.active_connections) || 0,
-          totalPositions: Number.parseInt(metrics.total_positions) || 0,
+          activeConnections: metrics?.active_connections ?? 0,
+          totalPositions: metrics?.total_positions ?? 0,
           dailyPnL: 0,
           totalBalance: 0,
-          indicationsActive: Number.parseInt(metrics.active_indications) || 0,
-          indicationsTotal: Number.parseInt(metrics.total_indications) || 0,
-          strategiesActive: Number.parseInt(metrics.active_strategies) || 0,
-          strategiesTotal: Number.parseInt(metrics.total_strategies) || 0,
+          indicationsActive: metrics?.active_indications ?? 0,
+          indicationsTotal: metrics?.total_indications ?? 0,
+          strategiesActive: metrics?.active_strategies ?? 0,
+          strategiesTotal: metrics?.total_strategies ?? 0,
           systemLoad: Math.round(cpuUsage),
           databaseSize: 45,
-          activeSymbols: Number.parseInt(metrics.active_symbols) || 0,
-          realPositions: Number.parseInt(metrics.real_positions) || 0,
-          pseudoPositionsBase: Number.parseInt(metrics.base_positions) || 0,
-          pseudoPositionsMain: Number.parseInt(metrics.main_positions) || 0,
-          pseudoPositionsReal: Number.parseInt(metrics.real_positions) || 0,
-          pseudoPositionsActive: Number.parseInt(metrics.active_positions) || 0,
+          activeSymbols: metrics?.active_symbols ?? 0,
+          realPositions: metrics?.real_positions ?? 0,
+          pseudoPositionsBase: metrics?.base_positions ?? 0,
+          pseudoPositionsMain: metrics?.main_positions ?? 0,
+          pseudoPositionsReal: metrics?.real_positions ?? 0,
+          pseudoPositionsActive: metrics?.active_positions ?? 0,
           profitFactorLast20h: Number.parseFloat(profitMetrics.pf_last_20h) || 0,
           profitFactorLast50: Number.parseFloat(profitMetrics.pf_last_50) || 0,
           profitFactorLast25: Number.parseFloat(profitMetrics25Result.pf_last_25) || 0,

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { initRedis, getSettings, setSettings, getConnection } from "@/lib/redis-db"
+import { initRedis, getSettings, setSettings, getConnection, getRedisClient } from "@/lib/redis-db"
 import { createExchangeConnector } from "@/lib/exchange-connectors"
 
 export const runtime = "nodejs"
@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
 
         if (activeConnection) {
           const connector = await createExchangeConnector(exchange, {
-            apiKey: activeConnection.api_key,
-            apiSecret: activeConnection.api_secret,
+            apiKey: activeConnection.api_key || "",
+            apiSecret: activeConnection.api_secret || "",
             apiPassphrase: activeConnection.api_passphrase || "",
             isTestnet: false,
             apiType: activeConnection.api_type || "perpetual_futures",
@@ -53,13 +53,27 @@ export async function GET(request: NextRequest) {
             last_update: new Date().toISOString(),
           }
         } else {
-          // Fallback to real price fetch without credentials if possible
-          const connector = await createExchangeConnector(exchange, { isTestnet: false })
-          marketData = await connector.getTicker(symbol)
+          // No active connection - use fallback data
+          const basePrice = getBasePrice(symbol)
+          marketData = {
+            symbol,
+            exchange,
+            interval,
+            price: basePrice,
+            open: basePrice,
+            high: basePrice,
+            low: basePrice,
+            close: basePrice,
+            volume: 0,
+            timestamp: Date.now(),
+            datetime: new Date().toISOString(),
+            last_update: new Date().toISOString(),
+          }
         }
 
         // Cache for 3 seconds for real data
-        await setSettings(cacheKey, JSON.stringify(marketData), { EX: 3 })
+        const client = getRedisClient()
+        await client.set(cacheKey, JSON.stringify(marketData), { EX: 3 })
       } catch (fetchError) {
         console.warn("[Market Data] Failed to fetch real data, using fallback:", fetchError)
         // Fallback - still generate but don't use random values, use static base prices

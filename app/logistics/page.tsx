@@ -721,7 +721,7 @@ function LogisticsContent() {
   const [livePos,      setLivePos]      = useState<LivePosition[]>([])
   const [lastRefresh,  setLastRefresh]  = useState<Date | null>(null)
   const [refreshing,   setRefreshing]   = useState(false)
-  const pollRef = useRef<ReturnType<typeof setInterval>>()
+  const pollRef = useRef<NodeJS.Timeout | null>(null)
 
   const loadAll = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true)
@@ -748,9 +748,9 @@ function LogisticsContent() {
 
   useEffect(() => {
     loadAll()
-    clearInterval(pollRef.current)
-    pollRef.current = setInterval(() => loadAll(true), 3000)
-    return () => clearInterval(pollRef.current)
+    if (pollRef.current) clearInterval(pollRef.current)
+    pollRef.current = setInterval(() => loadAll(true), 3000) as any
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [loadAll])
 
   const engineRunning = (stats?.indicationCycleCount || 0) > 0
