@@ -169,7 +169,7 @@ export class ProgressionStateManager {
       }
 
       const key = `progression:${connectionId}`
-      let data: Record<string, string> = {}
+      let data: Record<string, string> | null = null
       
       try {
         data = await client.hgetall(key)
