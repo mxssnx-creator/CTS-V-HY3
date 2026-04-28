@@ -35,7 +35,7 @@ EXPOSE 3001
 # Set environment
 ENV NODE_ENV=production
 ENV PORT=3001
-ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV NODE_OPTIONS="--max-old-space-size=8192"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
