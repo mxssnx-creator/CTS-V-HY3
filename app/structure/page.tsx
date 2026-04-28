@@ -25,6 +25,12 @@ import {
 } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { useExchange } from "@/lib/exchange-context"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
 
 interface SystemMetrics {
   cpu_usage: number
