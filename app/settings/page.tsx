@@ -433,7 +433,8 @@ const initialSettings: Settings = {
   maxPositionsPerConfigDirection: 1, // default 1 (max positions per config per direction)
   // P0-4: spec default 1 — hard cap on concurrent active pseudo
   // positions PER DIRECTION across all config Sets.
-  maxActiveBasePseudoPositionsPerDirection: 1,
+  // Default 10 - allows multiple Sets per direction for better throughput.
+  maxActiveBasePseudoPositionsPerDirection: 10,
   maxPositionsLong: 1, // Max 1 long position per configuration
   maxPositionsShort: 1, // Max 1 short position per configuration
     indicationTimeoutMs: 1000, // 100ms to 3000ms, step 100ms, default 1000ms

@@ -125,12 +125,32 @@ export function StrategyTab({ settings, handleSettingChange }: StrategyTabProps)
                             {settings.baseRatioMin?.toFixed(1)} - {settings.baseRatioMax?.toFixed(1)}
                           </span>
                         </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                     </div>
+
+                     <div className="space-y-2">
+                       <Label>Max Positions Per Direction (Base Stage)</Label>
+                       <p className="text-xs text-muted-foreground">
+                         Maximum concurrent pseudo positions per direction (long/short) across ALL Base config Sets.
+                         Higher values allow more Sets to evaluate simultaneously.
+                       </p>
+                       <div className="flex items-center gap-4">
+                         <Slider
+                           min={1}
+                           max={20}
+                           step={1}
+                           value={[settings.maxActiveBasePseudoPositionsPerDirection || 10]}
+                           onValueChange={([value]) => handleSettingChange("maxActiveBasePseudoPositionsPerDirection", value)}
+                           className="flex-1"
+                         />
+                         <span className="text-sm font-medium w-20 text-right">
+                           {settings.maxActiveBasePseudoPositionsPerDirection || 10}
+                         </span>
+                       </div>
+                     </div>
+                   </div>
+                 </CardContent>
+               </Card>
+             </TabsContent>
 
             <TabsContent value="trailing" className="space-y-4">
               {/*
