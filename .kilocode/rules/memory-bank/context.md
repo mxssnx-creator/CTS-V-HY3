@@ -2,15 +2,29 @@
 
 ## 2026-04-29
 - Fixed Dev Preview loading issues comprehensively:
-  - Fixed missing closing `</div>` tag in `strategy-tab.tsx` (line 84) that caused JSX parse errors
-  - Replaced non-existent `redisDb` imports with `getRedisClient` pattern in `calculator.ts`, `state-machine.ts`, `position-tracker.ts`
-  - Fixed Redis `ex` property to `EX` (uppercase) in multiple files for correct Node Redis client syntax
+  - Fixed missing closing `</div>` tag in `strategy-tab.tsx` (JSX syntax error on line 84)
+  - Replaced invalid `redisDb` imports with `getRedisClient()` pattern in `calculator.ts`, `state-machine.ts`, `position-tracker.ts`
+  - Fixed Redis option casing: changed `{ ex: ... }` to `{ EX: ... }` in `calculator.ts`, `state-machine.ts`, `position-tracker.ts`, `volatility-calculator.ts`
   - Added missing `zrevrange` method to `InlineLocalRedis` class in `redis-db.ts`
-  - Updated `set` method in `redis-db.ts` to support `NX` option for distributed locking
-  - Fixed `getMarketData` calls to include required `interval` argument (e.g., "1m")
+  - Extended `InlineLocalRedis.set()` to support `{ EX, NX }` options for atomic lock acquisition
+  - Fixed `getMarketData()` / `saveMarketData()` calls to include required `interval`/`timeframe` argument (defaulted to `"1m"`) in `auto-indication-engine.ts`, `db.ts`, `simple-indication-generator.ts`, `market-data-cache.ts`, `generate-safe-indications` route
   - Fixed `database.ts` exports: replaced non-existent `createTrade`/`updateTrade`/`updatePosition` with `saveTrade`/`savePosition`
-  - Added `Connection` type definition to `connection-state-helpers.ts` (was importing non-existent type from redis-db)
-  - Fixed `sync-live-positions/route.ts` to use correct Node Redis `set()` syntax with options object
+  - Added `Connection` interface to `connection-state-helpers.ts` (was importing non-existent type from redis-db)
+  - Fixed all `useRef<Type>()` calls to provide explicit initial `undefined` value in quickstart components
+  - Extended `StratDetail` interface in quickstart dialogs with optional `passed` and `evaluated` fields
+  - Fixed `saveIndication` calls to pass a single object with `id` field instead of separate arguments in `indication-processor-fixed.ts`
+  - Extended `fetchLivePriceFromExchange` return type to include `volume` and populated it from exchange APIs
+  - Fixed `sync-live-positions` route: corrected Redis `set` call syntax to use `{ EX: 55, NX: true }`
+  - Fixed `progression/[id]` route: removed impossible numeric comparison `doneMarker === 1`
+  - Fixed `settings/connections/[id]/indications` route: corrected `saveIndication` call signature
+  - Fixed `system/generate-safe-indications` route: added missing interval to `getMarketData` call
+  - Fixed `trading/engine-stats` route: cast empty object fallback to `any` to allow property access
+  - Fixed `exchange-connection-manager` Switch: converted string/boolean `is_testnet` to proper boolean via equality check
+  - Fixed `exchange-position-manager` undefined `volumeUsd` and `marginUsd` by defaulting to 0/1
+  - Fixed `realtime-processor` optional chaining for `prevSetPos.result` to avoid undefined access
+  - Extended `CycleMetrics` interface in `engine-performance-monitor.ts` with `strategiesLiveReady` and `totalCumulativeStrategies` to match engine-manager usage
+  - Simplified `bybit-connector` category check from `category !== "linear" && category !== "inverse"` to `category !== "linear"` to avoid unreachable type comparison
+- Verified build succeeds and dev server starts successfully on port 3002
 
 ## 2026-03-31
 - Updated QuickStart engine setup to explicitly assign and enable connection state during quickstart.
