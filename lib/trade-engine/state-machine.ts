@@ -11,7 +11,9 @@
 import { createExchangeConnector } from "@/lib/exchange-connectors"
 import { positionTracker, LivePosition, OrderRecord } from "@/lib/positions/position-tracker"
 import { indicatorCalculator, PriceData } from "@/lib/indicators/calculator"
-import { redisDb } from "@/lib/redis-db"
+import { getRedisClient } from "@/lib/redis-db"
+
+const redisDb = getRedisClient()
 
 export interface TradeEngineConfig {
   connectionId: string
@@ -70,7 +72,7 @@ export class TradeEngineStateMachine {
       this.state = "monitoring"
 
       const key = `${this.statePrefix}${config.connectionId}:config`
-      await redisDb.set(key, JSON.stringify(config), { ex: 3600 })
+      await redisDb.set(key, JSON.stringify(config), { EX: 3600 })
 
       console.log(`[v0] [TradeEngine] Initialized for connection ${config.connectionId}`)
       console.log(`[v0] [TradeEngine] Monitoring symbols: ${config.symbols.join(", ")}`)

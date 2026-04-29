@@ -1,4 +1,6 @@
-import { redisDb } from "@/lib/redis-db"
+import { getRedisClient } from "@/lib/redis-db"
+
+const redisDb = getRedisClient()
 
 /**
  * PHASE 3: Live Position Tracking System
@@ -54,7 +56,7 @@ export class PositionTracker {
       const key = `${this.POSITIONS_PREFIX}${position.connection_id}:${position.symbol}`
       const data = JSON.stringify(position)
       
-      await redisDb.set(key, data, { ex: this.TTL })
+      await redisDb.set(key, data, { EX: this.TTL })
       console.log(`[v0] [PositionTracker] Position recorded: ${key}`)
     } catch (error) {
       console.error(`[v0] [PositionTracker] Failed to record position:`, error)
@@ -126,7 +128,7 @@ export class PositionTracker {
       const key = `${this.ORDERS_PREFIX}${order.connection_id}:${order.id}`
       const data = JSON.stringify(order)
       
-      await redisDb.set(key, data, { ex: this.TTL })
+      await redisDb.set(key, data, { EX: this.TTL })
       console.log(`[v0] [PositionTracker] Order recorded: ${key}`)
     } catch (error) {
       console.error(`[v0] [PositionTracker] Failed to record order:`, error)
@@ -188,7 +190,7 @@ export class PositionTracker {
         order.closed_at = Date.now()
       }
       
-      await redisDb.set(key, JSON.stringify(order), { ex: this.TTL })
+      await redisDb.set(key, JSON.stringify(order), { EX: this.TTL })
       console.log(`[v0] [PositionTracker] Order updated: ${key} -> ${status}`)
     } catch (error) {
       console.error(`[v0] [PositionTracker] Failed to update order:`, error)

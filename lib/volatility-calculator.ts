@@ -161,7 +161,7 @@ export async function cacheVolatilityMetrics(metrics: VolatilityMetrics): Promis
     const client = getClient()
     
     const key = `volatility:${metrics.symbol}`
-    await client.set(key, JSON.stringify(metrics), { ex: 300 }) // Cache for 5 minutes
+    await client.set(key, JSON.stringify(metrics), { EX: 300 }) // Cache for 5 minutes
     
     // Also add to sorted set for ranking
     await client.zadd(`volatility:scores`, metrics.volatilityScore, metrics.symbol)

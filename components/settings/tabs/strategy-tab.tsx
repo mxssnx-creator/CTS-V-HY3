@@ -147,10 +147,11 @@ export function StrategyTab({ settings, handleSettingChange }: StrategyTabProps)
                          </span>
                        </div>
                      </div>
-                   </div>
-                 </CardContent>
-               </Card>
-             </TabsContent>
+                    </div>
+                  </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
             <TabsContent value="trailing" className="space-y-4">
               {/*

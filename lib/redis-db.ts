@@ -418,12 +418,17 @@ export class InlineLocalRedis {
     return this.data.strings.get(key) ?? null
   }
 
-  async set(key: string, value: string, options?: { EX?: number }): Promise<void> {
+  async set(key: string, value: string, options?: { EX?: number; NX?: boolean }): Promise<"OK" | null> {
     this.trackOperation()
+    // NX: only set if key does not exist
+    if (options?.NX && this.data.strings.has(key)) {
+      return null // Key already exists, don't set
+    }
     this.data.strings.set(key, value)
     if (options?.EX) {
       this.setKeyTTL(key, options.EX)
     }
+    return "OK"
   }
   
   async setex(key: string, seconds: number, value: string): Promise<void> {
@@ -768,6 +773,18 @@ export class InlineLocalRedis {
     if (remaining.length === 0) this.data.sorted_sets.delete(key)
     else this.data.sorted_sets.set(key, remaining)
     return before - remaining.length
+  }
+
+  async zrevrange(key: string, start: number, stop: number): Promise<string[]> {
+    const set = this.data.sorted_sets.get(key) || []
+    // Sort by score descending (highest first)
+    const sorted = [...set].sort((a, b) => b.score - a.score)
+    // Handle negative indices (Redis style)
+    const len = sorted.length
+    const actualStart = start < 0 ? Math.max(0, len + start) : Math.min(start, len)
+    const actualStop = stop < 0 ? Math.max(0, len + stop) : Math.min(stop, len)
+    // Return slice inclusive of stop
+    return sorted.slice(actualStart, actualStop + 1).map((entry) => entry.member)
   }
 
   async trackDatabaseOperation(limit: number): Promise<{ current: number; limit: number; exceeded: boolean }> {

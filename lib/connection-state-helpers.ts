@@ -3,7 +3,19 @@
  * Provides clean helpers for building connection update objects for Main Connections
  */
 
-import type { Connection } from './redis-db'
+// Connection type definition (not imported from redis-db as it doesn't export it)
+export interface Connection {
+  id: string
+  name: string
+  exchange: string
+  api_type?: string
+  is_assigned?: string | boolean
+  is_active_inserted?: string | boolean
+  is_enabled_dashboard?: string | boolean
+  is_active?: string | boolean
+  is_inserted?: string | boolean
+  [key: string]: any
+}
 
 export interface ConnectionState {
   main_assigned: boolean

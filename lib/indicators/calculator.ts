@@ -6,7 +6,9 @@
  * Supports: RSI, MACD, Bollinger Bands, EMA, ATR, Momentum, Divergence
  */
 
-import { redisDb } from "@/lib/redis-db"
+import { getRedisClient } from "@/lib/redis-db"
+
+const redisDb = getRedisClient()
 
 export interface IndicatorResult {
   indicator: string
@@ -237,7 +239,7 @@ export class IndicatorCalculator {
   async cacheResult(symbol: string, indicator: string, result: IndicatorResult): Promise<void> {
     try {
       const key = `${this.CACHE_PREFIX}${symbol}:${indicator}`
-      await redisDb.set(key, JSON.stringify(result), { ex: this.CACHE_TTL })
+      await redisDb.set(key, JSON.stringify(result), { EX: this.CACHE_TTL })
     } catch (error) {
       console.error(`[v0] [IndicatorCalculator] Failed to cache result:`, error)
     }

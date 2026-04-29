@@ -30,7 +30,7 @@ export async function GET() {
   // stacking two reconcile passes on top of each other. TTL = 55s so a
   // crashed run never permanently blocks the cron.
   const LOCK_KEY = "cron:sync-live-positions:lock"
-  const acquired = await client.set(LOCK_KEY, "1", "EX", 55, "NX")
+  const acquired = await client.set(LOCK_KEY, "1", { EX: 55, NX: true })
   if (!acquired) {
     return NextResponse.json({ ok: true, skipped: true, reason: "previous run still active" })
   }
