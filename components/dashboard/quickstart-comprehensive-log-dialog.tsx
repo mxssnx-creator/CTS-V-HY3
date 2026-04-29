@@ -21,6 +21,8 @@ interface StratDetail {
   // Live-only extras (optional on base/main/real)
   winRate?: number; totalPnl?: number; avgPnl?: number
   openPositions?: number; volumeUsdTotal?: number
+  // Strategy evaluation counts
+  passed?: number; evaluated?: number
 }
 
 interface LiveExecution {
@@ -176,7 +178,7 @@ export function QuickstartComprehensiveLogDialog() {
   const [expandedLog, setExpandedLog] = useState<number | null>(null)
   const [logFilter, setLogFilter] = useState<"all" | "info" | "success" | "warning" | "error">("all")
   const logsEndRef = useRef<HTMLDivElement>(null)
-  const pollRef = useRef<NodeJS.Timeout>()
+  const pollRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
   const fetchData = useCallback(async (silent = false) => {
     if (!activeConnectionId) return

@@ -87,7 +87,7 @@ async function routeQuery(queryText: string, params: any[] = []): Promise<{ rows
     // ---- SELECT FROM market_data / candles / ohlcv ----
     if (upper.includes("FROM MARKET_DATA") || upper.includes("FROM CANDLES") || upper.includes("FROM OHLCV")) {
       if (params.length >= 1) {
-        const data = await redisGetMarketData(String(params[0]))
+        const data = await redisGetMarketData(String(params[0]), "1m")
         return { rows: data || [], rowCount: (data || []).length }
       }
       return { rows: [], rowCount: 0 }

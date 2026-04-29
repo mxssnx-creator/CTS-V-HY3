@@ -177,7 +177,7 @@ export function QuickstartOverviewDialog() {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const [expandedLog, setExpandedLog] = useState<number | null>(null)
-  const pollRef = useRef<NodeJS.Timeout>()
+  const pollRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
   const load = useCallback(async (silent = false) => {
     if (!connectionId) return

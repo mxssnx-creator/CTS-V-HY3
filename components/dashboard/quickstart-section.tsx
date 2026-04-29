@@ -321,9 +321,9 @@ export function QuickstartSection() {
   const [liveSummary, setLiveSummary] = useState<ExchangeLiveSummary | null>(null)
 
   const logsEndRef = useRef<HTMLDivElement>(null)
-  const pollRef    = useRef<NodeJS.Timeout>()
-  const configPollRef = useRef<NodeJS.Timeout>()
-  const livePollRef   = useRef<NodeJS.Timeout>()
+  const pollRef    = useRef<NodeJS.Timeout | undefined>(undefined)
+  const configPollRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  const livePollRef   = useRef<NodeJS.Timeout | undefined>(undefined)
 
   // ── fetch live stats ──────────────────────────────────────────────────────
   const fetchStats = useCallback(async (silent = false) => {

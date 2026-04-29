@@ -22,16 +22,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params
     const { indications } = await request.json()
 
-    // Save indications to Redis
-    for (const ind of indications) {
-      await saveIndication(id, {
-        id: ind.id || `${id}-ind-${Date.now()}`,
-        connection_id: id,
-        type: ind.type || ind.indication_type,
-        enabled: ind.enabled !== false,
-        config: ind,
-      })
-    }
+     // Save indications to Redis
+     for (const ind of indications) {
+       await saveIndication({
+         id: ind.id || `${id}-ind-${Date.now()}`,
+         connection_id: id,
+         type: ind.type || ind.indication_type,
+         enabled: ind.enabled !== false,
+         config: ind,
+       })
+     }
 
     return NextResponse.json({ success: true })
   } catch (error) {

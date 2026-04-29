@@ -13,6 +13,8 @@ export interface CycleMetrics {
   symbolsProcessed: number
   indicationsGenerated: number
   strategiesEvaluated: number
+  strategiesLiveReady?: number
+  totalCumulativeStrategies?: number
   errors: number
   timestamp: string
 }

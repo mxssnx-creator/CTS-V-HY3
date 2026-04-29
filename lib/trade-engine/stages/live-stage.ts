@@ -400,18 +400,18 @@ async function accumulateIntoLivePosition(
           undefined,
           "market",
           { positionSide: realPosition.direction === "long" ? "LONG" : "SHORT" },
-        ),
-      (r) => !!r?.success && !!(r.orderId || r.id),
-      "accumulatePlaceOrder",
-    )
+       ),
+        (r) => !!((r as any)?.success) && !!((r as any)?.orderId || (r as any)?.id),
+       "accumulatePlaceOrder",
+     )
 
-    if (!orderResult?.success || !(orderResult.orderId || orderResult.id)) {
-      pushStep(
-        existing,
-        "accumulate",
-        false,
-        `additional order failed: ${orderResult?.error || "unknown"}`,
-      )
+     if (!orderResult?.success || !(orderResult?.orderId || orderResult?.id)) {
+       pushStep(
+         existing,
+         "accumulate",
+         false,
+         `additional order failed: ${orderResult?.error || "unknown"}`,
+       )
       await savePosition(existing)
       await incrementMetric(connectionId, "live_orders_failed_count")
       // Same cooldown trigger as the primary entry-order path —
@@ -1382,15 +1382,15 @@ export async function executeLivePosition(
         {
           positionSide: realPosition.direction === "long" ? "LONG" : "SHORT",
         },
-      ),
-      r => !!r?.success && !!(r.orderId || r.id),
-      "placeOrder"
-    )
+       ),
+       r => !!((r as any)?.success) && !!((r as any)?.orderId || (r as any)?.id),
+       "placeOrder"
+     )
 
-    if (!orderResult?.success || !(orderResult.orderId || orderResult.id)) {
-      livePosition.status = "error"
-      livePosition.statusReason = `Entry order failed: ${orderResult?.error || "unknown"}`
-      pushStep(livePosition, "place_order", false, livePosition.statusReason)
+     if (!orderResult?.success || !(orderResult?.orderId || orderResult?.id)) {
+       livePosition.status = "error"
+       livePosition.statusReason = `Entry order failed: ${orderResult?.error || "unknown"}`
+       pushStep(livePosition, "place_order", false, livePosition.statusReason)
       await savePosition(livePosition)
       await incrementMetric(connectionId, "live_orders_failed_count")
 

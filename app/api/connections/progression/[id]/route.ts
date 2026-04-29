@@ -249,13 +249,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           )
 
           // isComplete → either explicit flag, `:done` marker, or all symbols processed.
-          const isComplete =
-            prehistoricData.is_complete === "1" ||
-            prehistoricData.is_complete === "true" ||
-            doneMarker === "1" ||
-            doneMarker === 1 ||
-            (prehistoricProgress.symbolsTotal > 0 &&
-              prehistoricProgress.symbolsProcessed >= prehistoricProgress.symbolsTotal)
+           const isComplete =
+             prehistoricData.is_complete === "1" ||
+             prehistoricData.is_complete === "true" ||
+             doneMarker === "1" ||
+             (prehistoricProgress.symbolsTotal > 0 &&
+               prehistoricProgress.symbolsProcessed >= prehistoricProgress.symbolsTotal)
 
           prehistoricProgress.percentComplete = isComplete
             ? 100
