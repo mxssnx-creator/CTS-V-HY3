@@ -12,6 +12,66 @@
 const REDIS_DB_VERSION = "3.0.0"
 void REDIS_DB_VERSION
 
+// Type for external Redis (Upstash)
+type ExternalRedis = any
+
+// Common interface for Redis clients
+export interface RedisClient {
+  ping(): Promise<string>
+  info(): Promise<string>
+  get(key: string): Promise<string | null>
+  set(key: string, value: string, options?: { EX?: number; NX?: boolean }): Promise<"OK" | null>
+  setex(key: string, seconds: number, value: string): Promise<void>
+  incr(key: string): Promise<number>
+  incrby(key: string, increment: number): Promise<number>
+  del(...keys: string[]): Promise<number>
+  flushDb(): Promise<void>
+  hset(key: string, dataOrField: Record<string, string> | string, value?: string): Promise<number>
+  hmset(...args: string[]): Promise<void>
+  hgetall(key: string): Promise<Record<string, string> | null>
+  hlen(key: string): Promise<number>
+  hget(key: string, field: string): Promise<string | null>
+  hdel(key: string, ...fields: string[]): Promise<number>
+  hincrby(key: string, field: string, increment: number): Promise<number>
+  hincrbyfloat(key: string, field: string, increment: number): Promise<number>
+  sadd(key: string, ...members: string[]): Promise<number>
+  scard(key: string): Promise<number>
+  smembers(key: string): Promise<string[]>
+  sismember(key: string, member: string): Promise<number>
+  srem(key: string, ...members: string[]): Promise<number>
+  expire(key: string, seconds: number): Promise<number>
+  lpush(key: string, ...values: string[]): Promise<number>
+  rpush(key: string, ...values: string[]): Promise<number>
+  lrange(key: string, start: number, stop: number): Promise<string[]>
+  ltrim(key: string, start: number, stop: number): Promise<void>
+  llen(key: string): Promise<number>
+  lrem(key: string, count: number, value: string): Promise<number>
+  lpop(key: string): Promise<string | null>
+  rpop(key: string): Promise<string | null>
+  dbSize(): Promise<number>
+  keys(pattern: string): Promise<string[]>
+  zadd(key: string, score: number, member: string): Promise<number>
+  zrangebyscore(key: string, min: number | string, max: number | string): Promise<string[]>
+  zremrangebyscore(key: string, min: number | string, max: number | string): Promise<number>
+  zrevrange(key: string, start: number, stop: number): Promise<string[]>
+  trackDatabaseOperation(limit: number): Promise<{ current: number; limit: number; exceeded: boolean }>
+  getDatabaseOperationCount(): Promise<number>
+  load(): Promise<void>
+  cleanupExpiredKeysPublic(): Promise<number>
+  exists(key: string): Promise<number>
+  ttl(key: string): Promise<number>
+  multi(): any
+  pipeline(): any
+  // Disk persistence methods (no-ops for external Redis)
+  loadFromDisk?(): Promise<boolean>
+  saveToDisk?(): Promise<boolean>
+  saveToDiskSync?(): boolean
+  // Methods specific to InlineLocalRedis
+  loadFromDisk?(): Promise<boolean>
+  saveToDisk?(): Promise<boolean>
+  saveToDiskSync?(): boolean
+}
+
 interface RedisData {
   strings: Map<string, string>
   hashes: Map<string, Record<string, string>>
@@ -29,7 +89,98 @@ interface RedisData {
 // Global storage for persistence across hot reloads
 const globalForRedis = globalThis as unknown as { __redis_data?: RedisData }
 
-export class InlineLocalRedis {
+// External Redis wrapper for production (Upstash)
+class ExternalRedisWrapper implements RedisClient {
+  constructor(private externalRedis: any) {}
+
+  async ping() { return "PONG" }
+  async info() { return "redis_version:external" }
+
+  async get(key: string) { return this.externalRedis.get(key) }
+  async set(key: string, value: string, options?: { EX?: number; NX?: boolean }) {
+    if (options?.EX) {
+      return this.externalRedis.setex(key, options.EX, value)
+    }
+    if (options?.NX) {
+      return this.externalRedis.set(key, value, { nx: true })
+    }
+    return this.externalRedis.set(key, value)
+  }
+  async setex(key: string, seconds: number, value: string) {
+    return this.externalRedis.setex(key, seconds, value)
+  }
+  async incr(key: string) { return this.externalRedis.incr(key) }
+  async incrby(key: string, increment: number) { return this.externalRedis.incrby(key, increment) }
+  async del(...keys: string[]) { return this.externalRedis.del(...keys) }
+  async flushDb() { return this.externalRedis.flushdb() }
+  async hset(key: string, dataOrField: Record<string, string> | string, value?: string) {
+    return this.externalRedis.hset(key, dataOrField, value)
+  }
+  async hmset(...args: string[]) {
+    const [key, ...rest] = args
+    const data: Record<string, string> = {}
+    for (let i = 0; i < rest.length; i += 2) {
+      data[rest[i]] = rest[i + 1]
+    }
+    return this.externalRedis.hset(key, data)
+  }
+  async hgetall(key: string) { return this.externalRedis.hgetall(key) }
+  async hlen(key: string) { return this.externalRedis.hlen(key) }
+  async hget(key: string, field: string) { return this.externalRedis.hget(key, field) }
+  async hdel(key: string, ...fields: string[]) { return this.externalRedis.hdel(key, ...fields) }
+  async hincrby(key: string, field: string, increment: number) {
+    return this.externalRedis.hincrby(key, field, increment)
+  }
+  async hincrbyfloat(key: string, field: string, increment: number) {
+    return this.externalRedis.hincrbyfloat(key, field, increment)
+  }
+  async sadd(key: string, ...members: string[]) { return this.externalRedis.sadd(key, ...members) }
+  async scard(key: string) { return this.externalRedis.scard(key) }
+  async smembers(key: string) { return this.externalRedis.smembers(key) }
+  async sismember(key: string, member: string) { return this.externalRedis.sismember(key, member) }
+  async srem(key: string, ...members: string[]) { return this.externalRedis.srem(key, ...members) }
+  async expire(key: string, seconds: number) { return this.externalRedis.expire(key, seconds) }
+  async lpush(key: string, ...values: string[]) { return this.externalRedis.lpush(key, ...values) }
+  async rpush(key: string, ...values: string[]) { return this.externalRedis.rpush(key, ...values) }
+  async lrange(key: string, start: number, stop: number) { return this.externalRedis.lrange(key, start, stop) }
+  async ltrim(key: string, start: number, stop: number) { return this.externalRedis.ltrim(key, start, stop) }
+  async llen(key: string) { return this.externalRedis.llen(key) }
+  async lrem(key: string, count: number, value: string) { return this.externalRedis.lrem(key, count, value) }
+  async lpop(key: string) { return this.externalRedis.lpop(key) }
+  async rpop(key: string) { return this.externalRedis.rpop(key) }
+  async dbSize() { return this.externalRedis.dbsize() }
+  async keys(pattern: string) { return this.externalRedis.keys(pattern) }
+  async zadd(key: string, score: number, member: string) { return this.externalRedis.zadd(key, score, member) }
+  async zrangebyscore(key: string, min: number | string, max: number | string) {
+    return this.externalRedis.zrangebyscore(key, min, max)
+  }
+  async zremrangebyscore(key: string, min: number | string, max: number | string) {
+    return this.externalRedis.zremrangebyscore(key, min, max)
+  }
+  async zrevrange(key: string, start: number, stop: number) {
+    return this.externalRedis.zrevrange(key, start, stop)
+  }
+  async trackDatabaseOperation(limit: number) { return { current: 0, limit, exceeded: false } }
+  async getDatabaseOperationCount() { return 0 }
+  async load() { return }
+  async cleanupExpiredKeysPublic() { return 0 }
+  async exists(key: string) { return this.externalRedis.exists(key) }
+  async ttl(key: string) { return this.externalRedis.ttl(key) }
+  multi() { return this.externalRedis.multi() }
+  pipeline() { return this.externalRedis.pipeline() }
+  // Disk persistence methods (no-ops for external Redis - data persists in Redis)
+  loadFromDisk(): Promise<boolean> {
+    return Promise.resolve(true)
+  }
+  saveToDisk(): Promise<boolean> {
+    return Promise.resolve(true)
+  }
+  saveToDiskSync(): boolean {
+    return true
+  }
+}
+
+export class InlineLocalRedis implements RedisClient {
   private data: RedisData
 
   constructor() {
@@ -933,7 +1084,7 @@ export class InlineLocalRedis {
   }
 }
 
-let redisInstance: InlineLocalRedis | null = null
+let redisInstance: RedisClient | null = null
 let isConnected = false
 let connectionsInitialized = false
 let migrationsRan = false
@@ -942,11 +1093,39 @@ export async function initRedis(): Promise<void> {
   if (isConnected) return
 
   if (!redisInstance) {
-    redisInstance = new InlineLocalRedis()
-    // Restore from disk snapshot before any caller reads keys. The
-    // constructor also kicks off a background load, but awaiting here
-    // guarantees migrations + readers see hydrated state on first tick.
-    await redisInstance.loadFromDisk().catch(() => { /* fresh start ok */ })
+    // Check if external Redis (Upstash) is configured for production
+    const hasExternalRedis = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
+
+    if (hasExternalRedis && (process.env.NODE_ENV === 'production' || process.env.VERCEL)) {
+      try {
+        console.log("[v0] [Redis] Initializing external Redis (Upstash) for production")
+        const { Redis } = await import('@upstash/redis')
+        const externalRedis = new Redis({
+          url: process.env.KV_REST_API_URL!,
+          token: process.env.KV_REST_API_TOKEN!,
+        })
+
+        // Create a wrapper that implements the RedisClient interface
+        redisInstance = new ExternalRedisWrapper(externalRedis!)
+        console.log("[v0] [Redis] External Redis connected successfully")
+      } catch (error) {
+        console.warn("[v0] [Redis] Failed to connect to external Redis, falling back to in-memory:", error)
+        redisInstance = new InlineLocalRedis()
+        // Only call loadFromDisk if it's available (InlineLocalRedis)
+        if (redisInstance && 'loadFromDisk' in redisInstance) {
+          await (redisInstance as InlineLocalRedis).loadFromDisk().catch(() => { /* fresh start ok */ })
+        }
+      }
+    } else {
+      console.log("[v0] [Redis] Initializing in-memory Redis (development mode)")
+      redisInstance = new InlineLocalRedis()
+      // Restore from disk snapshot before any caller reads keys. The
+      // constructor also kicks off a background load, but awaiting here
+      // guarantees migrations + readers see hydrated state on first tick.
+      if (redisInstance && 'loadFromDisk' in redisInstance) {
+        await (redisInstance as InlineLocalRedis).loadFromDisk().catch(() => { /* fresh start ok */ })
+      }
+    }
   }
 
   isConnected = true
@@ -972,7 +1151,7 @@ export async function initRedis(): Promise<void> {
   }
 }
 
-export function getClient(): InlineLocalRedis {
+export function getClient(): RedisClient {
   if (!redisInstance) {
     redisInstance = new InlineLocalRedis()
     isConnected = true
@@ -980,7 +1159,7 @@ export function getClient(): InlineLocalRedis {
   return redisInstance
 }
 
-export function getRedisClient(): InlineLocalRedis {
+export function getRedisClient(): RedisClient {
   return getClient()
 }
 
@@ -2238,18 +2417,24 @@ export async function saveMarketData(symbol: string, timeframe: string, data: an
 
 export async function saveDatabaseSnapshot(): Promise<boolean> {
   const client = getRedisClient()
-  await client.saveToDisk()
+  if (client?.saveToDisk) {
+    await client.saveToDisk()
+  }
   return true
 }
 
 export async function loadDatabaseSnapshot(): Promise<boolean> {
   const client = getRedisClient()
-  await client.loadFromDisk()
+  if (client?.loadFromDisk) {
+    await client.loadFromDisk()
+  }
   return true
 }
 
 export function saveDatabaseSnapshotSync(): boolean {
   const client = getRedisClient()
-  client.saveToDiskSync()
+  if (client?.saveToDiskSync) {
+    client.saveToDiskSync()
+  }
   return true
 }

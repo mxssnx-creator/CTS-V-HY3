@@ -29,6 +29,10 @@
     {
       "path": "/api/cron/generate-indications",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/engine-auto-start",
+      "schedule": "*/2 * * * *"
     }
   ]
 }

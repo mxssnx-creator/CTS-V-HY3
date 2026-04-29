@@ -21,34 +21,40 @@ export function isAutoStartInitialized(): boolean {
 
 /**
  * Initialize trade engine monitor for auto-recovery/synchronization.
+ * In serverless environments (Vercel), this becomes a no-op since continuous monitoring
+ * is handled by cron jobs instead of long-running timers.
  */
 export async function initializeTradeEngineAutoStart(): Promise<void> {
   if (autoStartInitialized) {
     console.log("[v0] [Auto-Start] Already initialized, skipping")
-    if (!autoStartTimer) {
-      console.log("[v0] [Auto-Start] Monitor missing after init; restarting monitor")
-      startConnectionMonitoring()
-    }
+    return
+  }
+
+  // In serverless environments, skip continuous monitoring - use cron-based approach instead
+  const isServerless = typeof process !== "undefined" && (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)
+  if (isServerless) {
+    console.log("[v0] [Auto-Start] Serverless environment detected - using cron-based monitoring")
+    autoStartInitialized = true
     return
   }
 
   try {
     console.log("[v0] [Auto-Start] Starting trade engine auto-initialization (sync mode)...")
     const coordinator = getGlobalTradeEngineCoordinator()
-    
+
     // Check if Global Trade Engine Coordinator is running
     await initRedis()
     const client = getRedisClient()
     const globalState = await client.hgetall("trade_engine:global")
     const globalRunning = globalState?.status === "running"
-    
+
     if (!globalRunning) {
       console.log("[v0] [Auto-Start] Global Trade Engine is not running - monitor initialized, waiting for global start.")
       autoStartInitialized = true
       startConnectionMonitoring()
       return
     }
-    
+
     console.log("[v0] [Auto-Start] Monitoring initialized - enabled connections will be synchronized")
     autoStartInitialized = true
     startConnectionMonitoring()

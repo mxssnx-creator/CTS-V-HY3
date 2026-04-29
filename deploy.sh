@@ -37,7 +37,7 @@ if [ "$NODE_ENV" != "production" ]; then
     SERVER_PID=$!
     sleep 5
 
-    if curl -f http://localhost:3001/health > /dev/null 2>&1; then
+    if curl -f http://localhost:3002/health > /dev/null 2>&1; then
         echo -e "${GREEN}✅ Health check passed${NC}"
     else
         echo -e "${RED}❌ Health check failed${NC}"

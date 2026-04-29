@@ -1,6 +1,19 @@
 # Context
 
 ## 2026-04-29 (Updated)
+- **PRODUCTION FIX**: Added external Redis support for Vercel deployment persistence
+  - Added ExternalRedisWrapper class for Upstash Redis client compatibility
+  - Modified initRedis() to use external Redis when KV_REST_API_URL/KV_REST_API_TOKEN are set in production
+  - Installed @upstash/redis package for production Redis connectivity
+  - This resolves the "low DB keys" and "no real processing" issues in production by providing persistent storage
+- **SERVERLESS COMPATIBILITY**: Replaced long-running timers with cron-based architecture
+  - Modified trade-engine-auto-start.ts to skip continuous monitoring in serverless environments
+  - Added /api/cron/engine-auto-start route that runs every 2 minutes via Vercel cron
+  - Updated vercel.json with new cron job for engine synchronization
+- **ENVIRONMENT FIXES**: Corrected port and URL inconsistencies
+  - Updated .env.example PORT from 3001 to 3002 to match package.json
+  - Updated NEXT_PUBLIC_APP_URL to use port 3002
+  - Fixed deploy.sh health check to use correct port
 - Fixed Historic Processing display in MainPage Quickstart section:
   - Added `executed_positions` field write to prehistoric hash in `config-set-processor.ts` (line 577)
   - Verified API route `/api/connections/progression/[id]/stats` reads `historic_avg_profit_factor` and `executed_positions` from prehistoric hash
