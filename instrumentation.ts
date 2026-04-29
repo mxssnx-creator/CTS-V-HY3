@@ -39,9 +39,7 @@ export async function register() {
   // 1. completeStartup(): initialises Redis (which runs migrations AND
   //    restores the on-disk snapshot via loadFromDisk) and prepares the
   //    trade-engine coordinator singleton — without auto-starting any
-  //    engine. Without this hook the coordinator and snapshot only come
-  //    online when someone hits a route, which can be many minutes after
-  //    a redeploy.
+  //    engine.
   //
   // 2. initializeTradeEngineAutoStart(): starts the auto-start MONITOR
   //    only — it does NOT start engines on its own. The monitor scans for
@@ -59,13 +57,21 @@ export async function register() {
     console.error("[Instrumentation] completeStartup failed:", error)
   }
 
-  // Run pre-startup for default settings and market data (was previously skipped in production)
+  // Run pre-startup for default settings and market data
+  // IMPORTANT: This runs in ALL environments (including production) to ensure
+  // default settings, market data, and proper initialization are in place.
+  // It does NOT start engines in unsafe bootstrap mode.
   try {
     const { runPreStartup } = await import("@/lib/pre-startup")
     await runPreStartup()
   } catch (error) {
     console.error("[Instrumentation] runPreStartup failed:", error)
   }
+
+  // Log environment status for debugging
+  console.log(`[v0] [Env] NODE_ENV=${process.env.NODE_ENV || 'undefined'}`)
+  console.log(`[v0] [Env] Has KV_REST_API_URL=${!!process.env.KV_REST_API_URL}`)
+  console.log(`[v0] [Env] Runtime=${process.env.NEXT_RUNTIME || 'nodejs'}`)
 
   try {
     const { initializeTradeEngineAutoStart } = await import("@/lib/trade-engine-auto-start")

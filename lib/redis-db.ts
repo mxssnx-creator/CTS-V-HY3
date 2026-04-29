@@ -1084,49 +1084,57 @@ export class InlineLocalRedis implements RedisClient {
   }
 }
 
-let redisInstance: RedisClient | null = null
-let isConnected = false
-let connectionsInitialized = false
-let migrationsRan = false
+  let redisInstance: RedisClient | null = null
+  let isConnected = false
+  let connectionsInitialized = false
+  let migrationsRan = false
 
-export async function initRedis(): Promise<void> {
-  if (isConnected) return
+  export async function initRedis(): Promise<void> {
+    if (isConnected) return
 
-  if (!redisInstance) {
-    // Check if external Redis (Upstash) is configured for production
-    const hasExternalRedis = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
+    if (!redisInstance) {
+      // Check if external Redis (Upstash) is configured for production
+      const hasExternalRedis = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
 
-    if (hasExternalRedis && (process.env.NODE_ENV === 'production' || process.env.VERCEL)) {
-      try {
-        console.log("[v0] [Redis] Initializing external Redis (Upstash) for production")
-        const { Redis } = await import('@upstash/redis')
-        const externalRedis = new Redis({
-          url: process.env.KV_REST_API_URL!,
-          token: process.env.KV_REST_API_TOKEN!,
-        })
+      if (hasExternalRedis && (process.env.NODE_ENV === 'production' || process.env.VERCEL)) {
+        try {
+          console.log("[v0] [Redis] Initializing external Redis (Upstash) for production")
+          const { Redis } = await import('@upstash/redis')
+          const externalRedis = new Redis({
+            url: process.env.KV_REST_API_URL!,
+            token: process.env.KV_REST_API_TOKEN!,
+          })
 
-        // Create a wrapper that implements the RedisClient interface
-        redisInstance = new ExternalRedisWrapper(externalRedis!)
-        console.log("[v0] [Redis] External Redis connected successfully")
-      } catch (error) {
-        console.warn("[v0] [Redis] Failed to connect to external Redis, falling back to in-memory:", error)
+          // Create a wrapper that implements the RedisClient interface
+          redisInstance = new ExternalRedisWrapper(externalRedis!)
+          console.log("[v0] [Redis] External Redis connected successfully")
+        } catch (error) {
+          console.warn("[v0] [Redis] Failed to connect to external Redis, falling back to in-memory:", error)
+          redisInstance = new InlineLocalRedis()
+          // Only call loadFromDisk if it's available (InlineLocalRedis)
+          if (redisInstance && 'loadFromDisk' in redisInstance) {
+            await (redisInstance as InlineLocalRedis).loadFromDisk().catch(() => { /* fresh start ok */ })
+          }
+        }
+      } else {
+        // Use in-memory Redis for development OR production without external Redis credentials
+        // Note: In production, ensure .env.local is properly configured for persistence
+        const envMode = process.env.NODE_ENV === 'production' ? 'production (in-memory)' : 'development'
+        console.log(`[v0] [Redis] Initializing in-memory Redis (${envMode})`)
         redisInstance = new InlineLocalRedis()
-        // Only call loadFromDisk if it's available (InlineLocalRedis)
+        // Restore from disk snapshot before any caller reads keys. The
+        // constructor also kicks off a background load, but awaiting here
+        // guarantees migrations + readers see hydrated state on first tick.
         if (redisInstance && 'loadFromDisk' in redisInstance) {
           await (redisInstance as InlineLocalRedis).loadFromDisk().catch(() => { /* fresh start ok */ })
         }
-      }
-    } else {
-      console.log("[v0] [Redis] Initializing in-memory Redis (development mode)")
-      redisInstance = new InlineLocalRedis()
-      // Restore from disk snapshot before any caller reads keys. The
-      // constructor also kicks off a background load, but awaiting here
-      // guarantees migrations + readers see hydrated state on first tick.
-      if (redisInstance && 'loadFromDisk' in redisInstance) {
-        await (redisInstance as InlineLocalRedis).loadFromDisk().catch(() => { /* fresh start ok */ })
+        // Warn if running in production without external Redis
+        if (process.env.NODE_ENV === 'production' && !hasExternalRedis) {
+          console.warn("[v0] [Redis] WARNING: Running in production without external Redis (KV_REST_API_URL/KV_REST_API_TOKEN)")
+          console.warn("[v0] [Redis] Data persistence relies on local snapshot and is NOT shared across instances")
+        }
       }
     }
-  }
 
   isConnected = true
 

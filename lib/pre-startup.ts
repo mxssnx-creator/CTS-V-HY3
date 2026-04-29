@@ -4,7 +4,9 @@ import { runMigrations } from "@/lib/redis-migrations"
 let ran = false
 
 function shouldRunPreStartup(): boolean {
-  if (process.env.NEXT_RUNTIME !== "nodejs") return false
+  // Run in all Node.js runtime environments (including production)
+  // NEXT_RUNTIME can be "nodejs", "edge", or undefined
+  if (process.env.NEXT_RUNTIME && process.env.NEXT_RUNTIME !== "nodejs") return false
   return true
 }
 

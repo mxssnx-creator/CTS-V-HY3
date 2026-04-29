@@ -49,7 +49,8 @@ export async function initializeTradeEngineAutoStart(): Promise<void> {
     const globalRunning = globalState?.status === "running"
 
     if (!globalRunning) {
-      console.log("[v0] [Auto-Start] Global Trade Engine is not running - monitor initialized, waiting for global start.")
+      console.log("[v0] [Auto-Start] Global Trade Engine is not running - monitor initialized, waiting for global start or user action.")
+      console.log("[v0] [Auto-Start] Connections can be enabled via dashboard even without global running flag.")
       autoStartInitialized = true
       startConnectionMonitoring()
       return
@@ -87,13 +88,16 @@ export async function initializeTradeEngineAutoStart(): Promise<void> {
 
       monitorCycleInFlight = true
       try {
-        // Always check global engine status first
+        // Check global engine status - but don't block individual starts
+        // if connections are explicitly enabled by the user
         await initRedis()
         const monClient = getRedisClient()
         const monGlobalState = await monClient.hgetall("trade_engine:global")
         if (monGlobalState?.status !== "running") {
-          // Global engine not running - don't auto-start any connections
-          return
+          // Global engine not running, but still try to start individual
+          // connections that are explicitly enabled by the user. This allows
+          // the dashboard to work even when global flag is not set.
+          // (Continue without returning to allow connection startup)
         }
 
         const connections = await getAllConnections()
