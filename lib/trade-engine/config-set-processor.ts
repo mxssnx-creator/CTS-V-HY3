@@ -125,7 +125,7 @@ export class ConfigSetProcessor {
      // no true race, but this keeps the reads/writes explicit.
      let totalIndicationResults = 0
      let totalStrategyPositions = 0
-     let totalRealValidatedStrategies = 0 // Real-stage validated strategies count
+      let totalRealValidatedPositions = 0 // Real-stage validated positions count
      let symbolsProcessed = 0
      let symbolsWithoutData = 0
      let candlesProcessed = 0
@@ -280,9 +280,9 @@ export class ConfigSetProcessor {
           this.processStrategyConfigs(symbol, combinedCandles, strategyConfigs),
         ])
         
-// --- Run Base→Main→Real strategy flow to count Real-stage validated strategies ---
-         // This ensures executed_positions counts strategies that passed Real-stage validation
-         // (avgProfitFactor >= 1.4), not just Base-stage pseudo positions.
+// --- Run Base→Main→Real strategy flow to count Real-stage validated positions ---
+         // This ensures executed_positions counts actual positions that passed Real-stage
+         // validation (avgProfitFactor >= 1.4), not just Base-stage pseudo positions.
          let realValidatedCount = 0
          try {
            const strategyCoordinator = new StrategyCoordinator(this.connectionId)
@@ -306,14 +306,25 @@ export class ConfigSetProcessor {
            }
            if (indicationsForFlow.length > 0) {
              const evaluations = await strategyCoordinator.executeStrategyFlow(
-               symbol, 
-               indicationsForFlow, 
+               symbol,
+               indicationsForFlow,
                true // isPrehistoric = true
              )
              const realEval = evaluations.find(e => e.type === "real")
-             if (realEval) {
-               realValidatedCount = realEval.passedEvaluation
-               totalRealValidatedStrategies += realValidatedCount
+             if (realEval && realEval.passedEvaluation > 0) {
+               // Read Real sets from Redis to count actual positions
+               const realKey = `strategies:${this.connectionId}:${symbol}:real:sets`
+               const realData = await getSettings(realKey)
+               if (realData?.sets?.length > 0) {
+                 // Sum up entryCount across all Real sets that passed
+                 realValidatedCount = (realData.sets as any[]).reduce((sum: number, set: any) => {
+                   return sum + (set.entryCount || set.entries?.length || 0)
+                 }, 0)
+               } else {
+                 // Fallback: use passedEvaluation if can't read sets
+                 realValidatedCount = realEval.passedEvaluation
+               }
+               totalRealValidatedPositions += realValidatedCount
              }
            }
          } catch (flowErr) {
@@ -617,7 +628,7 @@ export class ConfigSetProcessor {
         last_run_candles: String(candlesProcessed),
         last_run_indication_results: String(totalIndicationResults),
 last_run_strategy_positions: String(totalStrategyPositions),
-           executed_positions: String(totalRealValidatedStrategies > 0 ? totalRealValidatedStrategies : totalStrategyPositions),
+            executed_positions: String(totalRealValidatedPositions > 0 ? totalRealValidatedPositions : totalStrategyPositions),
          })
       await client.expire(`prehistoric:${this.connectionId}`, 86400)
     } catch (err) {
