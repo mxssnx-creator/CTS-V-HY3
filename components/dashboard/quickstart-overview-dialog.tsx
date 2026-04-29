@@ -38,15 +38,16 @@ interface StratDetail {
 }
 
 interface StatsResponse {
-  historic: {
-    symbolsProcessed: number; symbolsTotal: number; candlesLoaded: number
-    indicatorsCalculated: number; cyclesCompleted: number; isComplete: boolean; progressPercent: number
-  }
-  realtime: {
-    indicationCycles: number; strategyCycles: number; realtimeCycles: number
-    indicationsTotal: number; strategiesTotal: number; positionsOpen: number
-    isActive: boolean; successRate: number; avgCycleTimeMs: number
-  }
+   historic: {
+     symbolsProcessed: number; symbolsTotal: number; candlesLoaded: number
+     indicatorsCalculated: number; cyclesCompleted: number; isComplete: boolean; progressPercent: number
+     avgProfitFactor?: number; executedPositions?: number
+   }
+   realtime: {
+     indicationCycles: number; strategyCycles: number; realtimeCycles: number
+     indicationsTotal: number; strategiesTotal: number; positionsOpen: number
+     isActive: boolean; successRate: number; avgCycleTimeMs: number
+   }
   breakdown: {
     indications: { direction: number; move: number; active: number; optimal: number; auto: number; total: number }
     strategies: { base: number; main: number; real: number; live: number; total: number
@@ -415,12 +416,18 @@ export function QuickstartOverviewDialog() {
                 <Progress value={h?.progressPercent || 0} className="h-2" />
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <StatCell label="Symbols"      value={fmt(h?.symbolsProcessed    || 0)} accent="text-blue-600 dark:text-blue-400" />
-                <StatCell label="Candles"      value={fmt(h?.candlesLoaded       || 0)} accent="text-sky-600 dark:text-sky-400" />
-                <StatCell label="Indicators"   value={fmt(h?.indicatorsCalculated|| 0)} accent="text-teal-600 dark:text-teal-400" />
-                <StatCell label="Preh Cycles"  value={fmt(h?.cyclesCompleted     || 0)} accent="text-indigo-600 dark:text-indigo-400" />
-              </div>
+<div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                 <StatCell label="Symbols"      value={fmt(h?.symbolsProcessed       || 0)} accent="text-blue-600 dark:text-blue-400" />
+                 <StatCell label="Candles"      value={fmt(h?.candlesLoaded        || 0)} accent="text-sky-600 dark:text-sky-400" />
+                 <StatCell label="Indicators"   value={fmt(h?.indicatorsCalculated || 0)} accent="text-teal-600 dark:text-teal-400" />
+                 <StatCell label="Preh Cycles"  value={fmt(h?.cyclesCompleted      || 0)} accent="text-indigo-600 dark:text-indigo-400" />
+                 {h?.avgProfitFactor && h.avgProfitFactor > 0 && (
+                   <StatCell label="Avg PF" value={h.avgProfitFactor.toFixed(2)} accent="text-emerald-600 dark:text-emerald-400" />
+                 )}
+                 {h?.executedPositions && h.executedPositions > 0 && (
+                   <StatCell label="Executed" value={fmt(h.executedPositions)} accent="text-amber-600 dark:text-amber-400" />
+                 )}
+               </div>
 
               <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
                 {[

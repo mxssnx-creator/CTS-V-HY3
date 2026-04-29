@@ -552,7 +552,7 @@ export class ConfigSetProcessor {
     //
     //   - last_run_at          : ISO timestamp of the run END
     //   - last_run_started_at  : ISO timestamp of the run START
-    //   - processing_duration_ms : total ms spent in processPrehistoricData
+//   - processing_duration_ms : total ms spent in processPrehistoricData
     //   - last_run_errors      : error count from the just-finished run
     //   - last_run_symbols     : symbols actually processed this run
     //
@@ -574,6 +574,7 @@ export class ConfigSetProcessor {
         last_run_candles: String(candlesProcessed),
         last_run_indication_results: String(totalIndicationResults),
         last_run_strategy_positions: String(totalStrategyPositions),
+        executed_positions: String(totalStrategyPositions),
       })
       await client.expire(`prehistoric:${this.connectionId}`, 86400)
     } catch (err) {

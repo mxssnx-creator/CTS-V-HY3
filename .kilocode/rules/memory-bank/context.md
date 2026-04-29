@@ -1,6 +1,12 @@
 # Context
 
 ## 2026-04-29 (Updated)
+- Fixed Historic Processing display in MainPage Quickstart section:
+  - Added `executed_positions` field write to prehistoric hash in `config-set-processor.ts` (line 577)
+  - Verified API route `/api/connections/progression/[id]/stats` reads `historic_avg_profit_factor` and `executed_positions` from prehistoric hash
+  - Confirmed `prehistoric_cycles_completed` is correctly incremented via `ProgressionStateManager.incrementPrehistoricCycle`
+  - Verified frontend components (`quickstart-section.tsx`, `quickstart-overview-dialog.tsx`) already display these fields
+  - All fields now exposed in historic section: cycles, avg profit factor, executed positions, frames processed
 - Fixed Dev Preview loading issues comprehensively:
   - Fixed missing closing `</div>` tag in `strategy-tab.tsx` (JSX syntax error on line 84)
   - Replaced invalid `redisDb` imports with `getRedisClient()` pattern in `calculator.ts`, `state-machine.ts`, `position-tracker.ts`

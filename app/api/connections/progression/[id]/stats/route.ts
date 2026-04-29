@@ -167,10 +167,12 @@ export async function GET(
       n(prehistoricHash.indicators_calculated),
       n(es.config_set_indication_results)
     )
-    const historicCyclesCompleted = pick(
-      n(progHash.prehistoric_cycles_completed),
-      n(es.config_set_symbols_processed)
-    )
+// Prehistoric cycles completed - actual cycles, NOT the 250 per-Set DB capacity
+    const historicCyclesCompleted =
+      n(prehistoricHash.cycles_completed) ||
+      n(progHash.prehistoric_cycles_completed) ||
+      n(es.config_set_symbols_processed) ||
+      0
     const historicIsComplete =
       prehistoricHash.is_complete === "1" ||
       progHash.prehistoric_phase_active === "false" && historicSymbolsProcessed > 0 ||
@@ -1058,28 +1060,32 @@ export async function GET(
       success: true,
       connectionId,
 
-      historic: {
-        symbolsProcessed:       historicSymbolsProcessed,
-        symbolsTotal:           historicSymbolsTotal,
-        candlesLoaded:          historicCandlesLoaded,
-        indicatorsCalculated:   historicIndicatorsCalculated,
-        cyclesCompleted:        historicCyclesCompleted,
-        isComplete:             historicIsComplete,
-        progressPercent:        historicProgressPercent,
+historic: {
+         symbolsProcessed:       historicSymbolsProcessed,
+         symbolsTotal:           historicSymbolsTotal,
+         candlesLoaded:          historicCandlesLoaded,
+         indicatorsCalculated:   historicIndicatorsCalculated,
+         cyclesCompleted:        historicCyclesCompleted,
+         isComplete:             historicIsComplete,
+         progressPercent:        historicProgressPercent,
 
-        // Frame/interval counters — at 1-second timeframes the source market
-        // data only holds ~480 candles per 8-hour window, so `candlesLoaded`
-        // stays small. The real "processed data units" count lives under
-        // `framesProcessed` (= intervalsProcessed from the config-set
-        // processor, one frame per timeframe tick across the range).
-        framesProcessed:        n(prehistoricMeta.intervalsProcessed),
-        framesMissingLoaded:    n(prehistoricMeta.missingIntervalsLoaded),
-        timeframeSeconds:       n(prehistoricMeta.timeframeSeconds) || 1,
+         // Frame/interval counters — at 1-second timeframes the source market
+         // data only holds ~480 candles per 8-hour window, so `candlesLoaded`
+         // stays small. The real "processed data units" count lives under
+         // `framesProcessed` (= intervalsProcessed from the config-set
+         // processor, one frame per timeframe tick across the range).
+         framesProcessed:        n(prehistoricMeta.intervalsProcessed),
+         framesMissingLoaded:    n(prehistoricMeta.missingIntervalsLoaded),
+         timeframeSeconds:       n(prehistoricMeta.timeframeSeconds) || 1,
 
-        // Prehistoric-processing churn counters — tick every time the engine spins
-        // through its evaluation loop, incl. idle/warmup ticks. Kept here so the UI
-        // can hide them from the primary live-progression display while still
-        // exposing them for debugging / operations dashboards.
+         // Historic processing metrics - avg profit factor and executed positions
+         avgProfitFactor:        parseFloat(prehistoricHash.historic_avg_profit_factor || "0"),
+         executedPositions:      n(prehistoricHash.executed_positions) || 0,
+
+         // Prehistoric-processing churn counters — tick every time the engine spins
+         // through its evaluation loop, incl. idle/warmup ticks. Kept here so the UI
+         // can hide them from the primary live-progression display while still
+         // exposing them for debugging / operations dashboards.
         processing: {
           indicationChurnCycles: churnIndicationCycles,
           strategyChurnCycles:   churnStrategyCycles,

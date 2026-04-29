@@ -138,18 +138,20 @@ interface MainCoordination {
 }
 
 interface LiveStats {
-  // historic
-  historicSymbols: number
-  historicSymbolsTotal: number
-  historicCycles: number
-  historicComplete: boolean
-  historicProgress: number
-  historicCandles: number
-  historicIndicators: number
-  // historic — frame/interval counters (big count for 1s timeframes)
-  historicFrames: number
-  historicFramesMissing: number
-  historicTimeframeSec: number
+   // historic
+   historicSymbols: number
+   historicSymbolsTotal: number
+   historicCycles: number
+   historicComplete: boolean
+   historicProgress: number
+   historicCandles: number
+   historicIndicators: number
+   historicAvgProfitFactor: number
+   historicExecutedPositions: number
+   // historic — frame/interval counters (big count for 1s timeframes)
+   historicFrames: number
+   historicFramesMissing: number
+   historicTimeframeSec: number
   // realtime
   indicationCycles: number
   strategyCycles: number
@@ -226,9 +228,10 @@ const EMPTY_MAIN_COORD: MainCoordination = {
 }
 
 const EMPTY_STATS: LiveStats = {
-  historicSymbols: 0, historicSymbolsTotal: 0, historicCycles: 0,
-  historicComplete: false, historicProgress: 0, historicCandles: 0, historicIndicators: 0,
-  historicFrames: 0, historicFramesMissing: 0, historicTimeframeSec: 1,
+   historicSymbols: 0, historicSymbolsTotal: 0, historicCycles: 0,
+   historicComplete: false, historicProgress: 0, historicCandles: 0, historicIndicators: 0,
+   historicAvgProfitFactor: 0, historicExecutedPositions: 0,
+   historicFrames: 0, historicFramesMissing: 0, historicTimeframeSec: 1,
   indicationCycles: 0, strategyCycles: 0, realtimeCycles: 0, indicationsTotal: 0,
   strategiesTotal: 0, positionsOpen: 0, successRate: 0, avgCycleMs: 0, isActive: false,
   indDirection: 0, indMove: 0, indActive: 0, indOptimal: 0, indAuto: 0,
@@ -417,17 +420,19 @@ export function QuickstartSection() {
         },
       }
 
-      setStats({
-        historicSymbols:       s.historic?.symbolsProcessed    || 0,
-        historicSymbolsTotal:  s.historic?.symbolsTotal        || 0,
-        historicCycles:        s.historic?.cyclesCompleted     || 0,
-        historicComplete:      s.historic?.isComplete          || false,
-        historicProgress:      s.historic?.progressPercent     || 0,
-        historicCandles:       s.historic?.candlesLoaded       || 0,
-        historicIndicators:    s.historic?.indicatorsCalculated || 0,
-        historicFrames:        s.historic?.framesProcessed     || 0,
-        historicFramesMissing: s.historic?.framesMissingLoaded || 0,
-        historicTimeframeSec:  s.historic?.timeframeSeconds    || 1,
+setStats({
+         historicSymbols:       s.historic?.symbolsProcessed    || 0,
+         historicSymbolsTotal:  s.historic?.symbolsTotal        || 0,
+         historicCycles:        s.historic?.cyclesCompleted     || 0,
+         historicComplete:      s.historic?.isComplete          || false,
+         historicProgress:      s.historic?.progressPercent     || 0,
+         historicCandles:       s.historic?.candlesLoaded       || 0,
+         historicIndicators:    s.historic?.indicatorsCalculated || 0,
+         historicAvgProfitFactor: s.historic?.avgProfitFactor    || 0,
+         historicExecutedPositions: s.historic?.executedPositions || 0,
+         historicFrames:        s.historic?.framesProcessed     || 0,
+         historicFramesMissing: s.historic?.framesMissingLoaded || 0,
+         historicTimeframeSec:  s.historic?.timeframeSeconds    || 1,
         indicationCycles:      indCycles,
         strategyCycles:        stratCycles,
         realtimeCycles:        s.realtime?.realtimeCycles      || 0,
@@ -1118,23 +1123,29 @@ export function QuickstartSection() {
               {!stats.historicComplete && (
                 <Progress value={stats.historicProgress} className="h-1" />
               )}
-              <div className="flex flex-wrap gap-1.5">
-                <MiniStat label="Symbols"    value={`${stats.historicSymbols}/${stats.historicSymbolsTotal}`} />
-                <MiniStat label="Preh Cycles" value={fmt(stats.historicCycles)} />
-                {stats.historicFrames > 0 && (
-                  <MiniStat
-                    label={`Frames ${stats.historicTimeframeSec}s`}
-                    value={fmt(stats.historicFrames)}
-                    sub={stats.historicFramesMissing > 0 ? `${fmt(stats.historicFramesMissing)} missing` : undefined}
-                  />
-                )}
-                {stats.historicCandles > 0 && (
-                  <MiniStat label="Candles" value={fmt(stats.historicCandles)} />
-                )}
-                {stats.historicIndicators > 0 && (
-                  <MiniStat label="Indicators" value={fmt(stats.historicIndicators)} />
-                )}
-              </div>
+<div className="flex flex-wrap gap-1.5">
+                 <MiniStat label="Symbols"    value={`${stats.historicSymbols}/${stats.historicSymbolsTotal}`} />
+                 <MiniStat label="Preh Cycles" value={fmt(stats.historicCycles)} />
+                 {stats.historicFrames > 0 && (
+                   <MiniStat
+                     label={`Frames ${stats.historicTimeframeSec}s`}
+                     value={fmt(stats.historicFrames)}
+                     sub={stats.historicFramesMissing > 0 ? `${fmt(stats.historicFramesMissing)} missing` : undefined}
+                   />
+                 )}
+                 {stats.historicCandles > 0 && (
+                   <MiniStat label="Candles" value={fmt(stats.historicCandles)} />
+                 )}
+                 {stats.historicIndicators > 0 && (
+                   <MiniStat label="Indicators" value={fmt(stats.historicIndicators)} />
+                 )}
+                 {stats.historicAvgProfitFactor > 0 && (
+                   <MiniStat label="Avg PF" value={stats.historicAvgProfitFactor.toFixed(2)} />
+                 )}
+                 {stats.historicExecutedPositions > 0 && (
+                   <MiniStat label="Executed" value={fmt(stats.historicExecutedPositions)} />
+                 )}
+               </div>
             </div>
 
             {/* processing cycles overview */}
