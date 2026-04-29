@@ -182,66 +182,197 @@ export class StrategySetsProcessor {
 
   /**
    * Base Strategy Set - Conservative, low-risk signals only
+   * Now FULLY ASYNC - each indication processed independently
    */
   private async processBaseStrategySet(symbol: string, indications: any[]): Promise<any> {
     const setKey = `strategy_set:${this.connectionId}:${symbol}:base`
     let qualified = 0
     let total = 0
 
-    for (const indication of indications) {
-      try {
-        total++
-        // Base: broad intake (must be much higher volume than main/real)
-        if (indication.confidence > 0.45 && indication.profitFactor > 0.9) {
-          const strategy = {
-            profitFactor: indication.profitFactor * 0.95,
-            confidence: indication.confidence,
-            metadata: { ...indication.metadata, strategyType: "base", riskLevel: "low" },
+    const processResults = await Promise.all(
+      indications.map(async (indication) => {
+        try {
+          if (indication.confidence > 0.45 && indication.profitFactor > 0.9) {
+            const strategy = {
+              profitFactor: indication.profitFactor * 0.95,
+              confidence: indication.confidence,
+              metadata: { ...indication.metadata, strategyType: "base", riskLevel: "low",
+                configSignature: this.generateConfigSignature(indication),
+                direction: indication.direction || (indication.metadata?.firstDir > 0 ? "long" : "short") },
+            }
+            if (strategy.profitFactor >= 1.0) {
+              await this.saveStrategyToSet(setKey, strategy, "base", indication.type)
+              return { qualified: 1, total: 1 }
+            }
           }
-
-          if (strategy.profitFactor >= 1.0) {
-            qualified++
-            await this.saveStrategyToSet(setKey, strategy, "base", indication.type)
-          }
+        } catch (error) {
+          console.error(`[v0] [StrategySets] Base strategy error:`, error)
         }
-      } catch (error) {
-        console.error(`[v0] [StrategySets] Base strategy error:`, error)
-      }
-    }
-
+        return { qualified: 0, total: 1 }
+      })
+    )
+    qualified = processResults.reduce((sum, r) => sum + (r?.qualified || 0), 0)
+    total = processResults.length
     return { type: "base", total, qualified }
   }
 
   /**
    * Main Strategy Set - Balanced, medium-risk signals
+   * Tracks ACCUMULATED positions for SPECIFIC Base configurations only
+   * Implements hedging for same config ranges
    */
   private async processMainStrategySet(symbol: string, indications: any[]): Promise<any> {
     const setKey = `strategy_set:${this.connectionId}:${symbol}:main`
     let qualified = 0
     let total = 0
+    const activePositions = new Map()
+    const baseSignatures = await this.loadBaseConfigSignatures(symbol)
 
-    for (const indication of indications) {
-      try {
-        total++
-        // Main: stricter than base
-        if (indication.confidence > 0.62 && indication.profitFactor > 1.2) {
-          const strategy = {
-            profitFactor: indication.profitFactor,
-            confidence: indication.confidence,
-            metadata: { ...indication.metadata, strategyType: "main", riskLevel: "medium" },
-          }
+    const processResults = await Promise.all(
+      indications.map(async (indication) => {
+        try {
+          total++
+          if (indication.confidence > 0.62 && indication.profitFactor > 1.2) {
+            const configSig = this.generateConfigSignature(indication)
+            if (!baseSignatures.has(configSig)) return { qualified: 0, total: 1 }
 
-          if (strategy.profitFactor >= 1.0) {
-            qualified++
-            await this.saveStrategyToSet(setKey, strategy, "main", indication.type)
+            const direction = indication.direction || (indication.metadata?.firstDir > 0 ? "long" : "short")
+            const currentCounts = activePositions.get(configSig) || { long: 0, short: 0 }
+            const positionLimit = await this.getPositionLimitForConfig(configSig, symbol)
+            const totalCurrent = currentCounts.long + currentCounts.short
+            if (totalCurrent >= positionLimit) return { qualified: 0, total: 1 }
+
+            const strategy = {
+              profitFactor: indication.profitFactor,
+              confidence: indication.confidence,
+              metadata: { ...indication.metadata, strategyType: "main", riskLevel: "medium",
+                configSignature: configSig, direction: direction,
+                accumulatedLong: currentCounts.long, accumulatedShort: currentCounts.short },
+            }
+
+            if (strategy.profitFactor >= 1.0) {
+              qualified++
+              await this.saveStrategyToSet(setKey, strategy, "main", indication.type)
+              if (direction === "long") currentCounts.long++
+              else currentCounts.short++
+              activePositions.set(configSig, currentCounts)
+              await this.createHedgePosition(setKey, indication, configSig, currentCounts, symbol)
+            }
           }
+        } catch (error) {
+          console.error(`[v0] [StrategySets] Main strategy error:`, error)
         }
-      } catch (error) {
-        console.error(`[v0] [StrategySets] Main strategy error:`, error)
-      }
-    }
+        return { qualified: 0, total: 1 }
+      })
+    )
 
+    await this.saveAccumulatedPositions(symbol, activePositions)
+    qualified = processResults.reduce((sum, r) => sum + (r?.qualified || 0), 0)
+    total = processResults.length
     return { type: "main", total, qualified }
+  }
+
+
+  /**
+   * Create hedged position in opposite direction
+   */
+  private async createHedgePosition(
+    setKey: string, indication: any, configSig: string,
+    currentCounts: { long: number; short: number }, symbol: string
+  ): Promise<void> {
+    try {
+      const positionLimit = await this.getPositionLimitForConfig(configSig, symbol)
+      const totalCurrent = currentCounts.long + currentCounts.short
+      if (totalCurrent >= positionLimit) return
+      const originalDirection = indication.direction || (indication.metadata?.firstDir > 0 ? "long" : "short")
+      const hedgeDirection = originalDirection === "long" ? "short" : "long"
+      const oppositeCount = hedgeDirection === "long" ? currentCounts.long : currentCounts.short
+      const originalCount = originalDirection === "long" ? currentCounts.long : currentCounts.short
+      if (oppositeCount >= originalCount) return
+      const hedgeStrategy = {
+        profitFactor: indication.profitFactor * 0.95,
+        confidence: indication.confidence * 0.9,
+        metadata: { ...indication.metadata, strategyType: "main", riskLevel: "medium",
+          configSignature: configSig, direction: hedgeDirection, isHedge: true,
+          hedgedAgainstDirection: originalDirection,
+          accumulatedLong: currentCounts.long, accumulatedShort: currentCounts.short },
+      }
+      if (hedgeStrategy.profitFactor >= 1.0) {
+        await this.saveStrategyToSet(setKey, hedgeStrategy, "main", indication.type)
+      }
+    } catch (error) {
+      console.error(`[v0] [StrategySets] Hedge position creation error:`, error)
+    }
+  }
+
+  /**
+   * Generate unique configuration signature
+   */
+  private generateConfigSignature(indication: any): string {
+    const type = indication.type || "unknown"
+    const direction = indication.direction || (indication.metadata?.firstDir > 0 ? "long" : "short")
+    const range = indication.metadata?.range || indication.metadata?.indication_range || 0
+    const tpFactor = indication.metadata?.takeprofit_factor || indication.metadata?.tpFactor || 0
+    const slRatio = indication.metadata?.stoploss_ratio || indication.metadata?.slRatio || 0
+    const trailing = indication.metadata?.trailing_enabled || false
+    return `${type}:${direction}:r${range}:tp${tpFactor}:sl${slRatio}:tr${trailing}`
+  }
+
+  /**
+   * Load Base configuration signatures
+   */
+  private async loadBaseConfigSignatures(symbol: string): Promise<Set<string>> {
+    const signatures = new Set()
+    try {
+      const client = await getCachedClient()
+      const baseKey = `strategy_set:${this.connectionId}:${symbol}:base`
+      const data = await client.get(baseKey)
+      if (data) {
+        const entries = JSON.parse(data)
+        for (const entry of entries) {
+          if (entry.metadata?.configSignature) signatures.add(entry.metadata.configSignature)
+        }
+      }
+    } catch (error) {
+      console.error(`[v0] [StrategySets] Failed to load base signatures:`, error)
+    }
+    return signatures
+  }
+
+  /**
+   * Get position limit for a configuration
+   */
+  private async getPositionLimitForConfig(configSig: string, symbol: string): Promise<number> {
+    const defaultLimit = 10
+    try {
+      const limitKey = `config_limit:${this.connectionId}:${symbol}:${configSig}`
+      const client = await getCachedClient()
+      const limit = await client.get(limitKey)
+      if (limit) return Math.min(parseInt(limit), 50)
+    } catch (error) {
+      console.error(`[v0] [StrategySets] Failed to get position limit:`, error)
+    }
+    return defaultLimit
+  }
+
+  /**
+   * Save accumulated position counts
+   */
+  private async saveAccumulatedPositions(
+    symbol: string, activePositions: Map<string, { long: number; short: number }>
+  ): Promise<void> {
+    try {
+      const client = await getCachedClient()
+      const accumKey = `accumulated_positions:${this.connectionId}:${symbol}:main`
+      const positionsData: Record<string, any> = {}
+      for (const [configSig, counts] of activePositions.entries()) {
+        positionsData[configSig] = counts
+      }
+      await client.set(accumKey, JSON.stringify(positionsData))
+      await client.expire(accumKey, 3600)
+    } catch (error) {
+      console.error(`[v0] [StrategySets] Failed to save accumulated positions:`, error)
+    }
   }
 
   /**
