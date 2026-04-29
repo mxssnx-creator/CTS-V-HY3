@@ -5,7 +5,6 @@ let ran = false
 
 function shouldRunPreStartup(): boolean {
   if (process.env.NEXT_RUNTIME !== "nodejs") return false
-  if (process.env.NODE_ENV === "production") return false
   return true
 }
 
@@ -101,10 +100,9 @@ export async function runPreStartup() {
   ran = true
 
   try {
-    await initRedis()
-    await runMigrations()
+    // Redis and migrations are already done by completeStartup() in instrumentation.ts
+    // We only need to run the additional setup that wasn't covered
     await initializeDefaultSettings()
-    await seedPredefinedConnections()
     await seedMarketData()
     await testAllExchangeConnections()
 
@@ -112,4 +110,11 @@ export async function runPreStartup() {
   } catch (error) {
     console.error("[v0] Pre-startup failed:", error)
   }
+}
+
+/**
+ * Reset the ran flag - used by database flush to allow re-seeding
+ */
+export function resetPreStartupRanFlag() {
+  ran = false
 }

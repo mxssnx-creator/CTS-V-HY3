@@ -56,7 +56,8 @@ export async function POST(request: NextRequest) {
 
     // Step 4: Reseed data (connections, market data, settings)
     try {
-      const { runPreStartup } = await import("@/lib/pre-startup")
+      const { runPreStartup, resetPreStartupRanFlag } = await import("@/lib/pre-startup")
+      resetPreStartupRanFlag() // Allow re-seeding after flush
       await runPreStartup()
       logs.push("✓ Predefined connections seeded")
       logs.push("✓ Market data seeded for all symbols")

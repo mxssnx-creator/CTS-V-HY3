@@ -59,6 +59,14 @@ export async function register() {
     console.error("[Instrumentation] completeStartup failed:", error)
   }
 
+  // Run pre-startup for default settings and market data (was previously skipped in production)
+  try {
+    const { runPreStartup } = await import("@/lib/pre-startup")
+    await runPreStartup()
+  } catch (error) {
+    console.error("[Instrumentation] runPreStartup failed:", error)
+  }
+
   try {
     const { initializeTradeEngineAutoStart } = await import("@/lib/trade-engine-auto-start")
     await initializeTradeEngineAutoStart()
