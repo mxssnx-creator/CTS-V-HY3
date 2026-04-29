@@ -225,7 +225,7 @@ export class StrategySetsProcessor {
     const setKey = `strategy_set:${this.connectionId}:${symbol}:main`
     let qualified = 0
     let total = 0
-    const activePositions = new Map()
+    const activePositions = new Map<string, { long: number; short: number }>()
     const baseSignatures = await this.loadBaseConfigSignatures(symbol)
 
     const processResults = await Promise.all(
@@ -322,7 +322,7 @@ export class StrategySetsProcessor {
    * Load Base configuration signatures
    */
   private async loadBaseConfigSignatures(symbol: string): Promise<Set<string>> {
-    const signatures = new Set()
+    const signatures = new Set<string>()
     try {
       const client = await getCachedClient()
       const baseKey = `strategy_set:${this.connectionId}:${symbol}:base`
