@@ -1,5 +1,17 @@
 # Context
 
+## 2026-04-29
+- Fixed Dev Preview loading issues comprehensively:
+  - Fixed missing closing `</div>` tag in `strategy-tab.tsx` (line 84) that caused JSX parse errors
+  - Replaced non-existent `redisDb` imports with `getRedisClient` pattern in `calculator.ts`, `state-machine.ts`, `position-tracker.ts`
+  - Fixed Redis `ex` property to `EX` (uppercase) in multiple files for correct Node Redis client syntax
+  - Added missing `zrevrange` method to `InlineLocalRedis` class in `redis-db.ts`
+  - Updated `set` method in `redis-db.ts` to support `NX` option for distributed locking
+  - Fixed `getMarketData` calls to include required `interval` argument (e.g., "1m")
+  - Fixed `database.ts` exports: replaced non-existent `createTrade`/`updateTrade`/`updatePosition` with `saveTrade`/`savePosition`
+  - Added `Connection` type definition to `connection-state-helpers.ts` (was importing non-existent type from redis-db)
+  - Fixed `sync-live-positions/route.ts` to use correct Node Redis `set()` syntax with options object
+
 ## 2026-03-31
 - Updated QuickStart engine setup to explicitly assign and enable connection state during quickstart.
 - QuickStart now writes assignment/activation flags (`is_active_inserted`, `is_dashboard_inserted`, `is_enabled_dashboard`, `is_assigned`, `is_active`) before startup checks.
