@@ -11,6 +11,7 @@ import { StrategyConfigManager, PseudoPosition, StrategyConfig } from "@/lib/str
 import { getRedisClient, initRedis, getSettings } from "@/lib/redis-db"
 import { logProgressionEvent } from "@/lib/engine-progression-logs"
 import { ProgressionStateManager } from "@/lib/progression-state-manager"
+import { StrategyCoordinator } from "@/lib/strategy-coordinator"
 
 export interface ProcessingResult {
   indicationConfigs: number
@@ -119,17 +120,18 @@ export class ConfigSetProcessor {
     await initRedis()
     const client = getRedisClient()
 
-    // Mutable aggregates updated from parallel workers — guard with a lightweight
-    // local function since JS is single-threaded inside the event loop there's
-    // no true race, but this keeps the reads/writes explicit.
-    let totalIndicationResults = 0
-    let totalStrategyPositions = 0
-    let symbolsProcessed = 0
-    let symbolsWithoutData = 0
-    let candlesProcessed = 0
-    let errors = 0
-    let totalIntervalsProcessed = 0
-    let missingIntervalsLoaded = 0
+// Mutable aggregates updated from parallel workers — guard with a lightweight
+     // local function since JS is single-threaded inside the event loop there's
+     // no true race, but this keeps the reads/writes explicit.
+     let totalIndicationResults = 0
+     let totalStrategyPositions = 0
+     let totalRealValidatedStrategies = 0 // Real-stage validated strategies count
+     let symbolsProcessed = 0
+     let symbolsWithoutData = 0
+     let candlesProcessed = 0
+     let errors = 0
+     let totalIntervalsProcessed = 0
+     let missingIntervalsLoaded = 0
 
     const tConfigsStart = Date.now()
     const [indicationConfigs, strategyConfigs] = await Promise.all([
@@ -277,6 +279,47 @@ export class ConfigSetProcessor {
           this.processIndicationConfigs(symbol, combinedCandles, indicationConfigs),
           this.processStrategyConfigs(symbol, combinedCandles, strategyConfigs),
         ])
+        
+// --- Run Base→Main→Real strategy flow to count Real-stage validated strategies ---
+         // This ensures executed_positions counts strategies that passed Real-stage validation
+         // (avgProfitFactor >= 1.4), not just Base-stage pseudo positions.
+         let realValidatedCount = 0
+         try {
+           const strategyCoordinator = new StrategyCoordinator(this.connectionId)
+           // Build indications array from all enabled configs - each indication result
+           // needs type and direction for StrategyCoordinator to create (type × direction) Sets
+           const indicationsForFlow: any[] = []
+           for (const cfg of indicationConfigs) {
+             const results = await this.indicationManager.getResults(cfg.id, 250)
+             for (const r of results) {
+               indicationsForFlow.push({
+                 type: cfg.type,
+                 symbol: r.symbol,
+                 timestamp: r.timestamp,
+                 signal: r.signal,
+                 value: r.value,
+                 confidence: r.confidence ?? 0.5,
+                 profitFactor: r.confidence ? r.confidence * 2 : 1.0,
+                 metadata: { direction: r.signal === "buy" ? "long" : r.signal === "sell" ? "short" : "neutral" },
+               })
+             }
+           }
+           if (indicationsForFlow.length > 0) {
+             const evaluations = await strategyCoordinator.executeStrategyFlow(
+               symbol, 
+               indicationsForFlow, 
+               true // isPrehistoric = true
+             )
+             const realEval = evaluations.find(e => e.type === "real")
+             if (realEval) {
+               realValidatedCount = realEval.passedEvaluation
+               totalRealValidatedStrategies += realValidatedCount
+             }
+           }
+         } catch (flowErr) {
+           console.warn(`[v0] [ConfigSetProcessor] Strategy flow failed for ${symbol}:`, flowErr instanceof Error ? flowErr.message : String(flowErr))
+         }
+        
         const tCalcMs = Date.now() - tCalcStart
 
         totalIndicationResults += indicationResults
@@ -573,9 +616,9 @@ export class ConfigSetProcessor {
         last_run_symbols: String(symbolsProcessed),
         last_run_candles: String(candlesProcessed),
         last_run_indication_results: String(totalIndicationResults),
-        last_run_strategy_positions: String(totalStrategyPositions),
-        executed_positions: String(totalStrategyPositions),
-      })
+last_run_strategy_positions: String(totalStrategyPositions),
+           executed_positions: String(totalRealValidatedStrategies > 0 ? totalRealValidatedStrategies : totalStrategyPositions),
+         })
       await client.expire(`prehistoric:${this.connectionId}`, 86400)
     } catch (err) {
       console.warn(
