@@ -1,5 +1,14 @@
 # Context
 
+## 2026-04-30 (ESLint React Hooks Fix)
+- **ESLINT FIX**: Fixed `react-hooks/exhaustive-deps` rule not found error:
+  - Installed `eslint-plugin-react-hooks@7.1.1`
+  - Updated `eslint.config.mjs` to import and register the plugin
+  - Added `"react-hooks/exhaustive-deps": "warn"` rule to ESLint config
+- **VERIFICATION**: `bun lint` now passes with no errors (only warnings remain for `no-explicit-any` and `no-unused-vars`)
+- **TYPECHECK**: `bun typecheck` passes with 0 errors
+- **BUILD**: `npm run build` succeeds (169 pages generated)
+
 ## 2026-04-30 (Historic Symbols Fix + TypeScript Strict Mode Fix)
 - **HISTORIC SYMBOLS FIX**: Fixed "Quick Start Historic Symbols Shows 1/1 while N selected" issue by ensuring `symbols_total` is always set in the `prehistoric:{connId}` Redis hash across all write paths:
   - `engine-manager.ts` `runPrehistoricProcessing()`: Now writes `symbols_total` on initial hash setup (line 792)

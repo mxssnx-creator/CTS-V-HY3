@@ -1,6 +1,7 @@
 import tsParser from "@typescript-eslint/parser";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import nextPlugin from "@next/eslint-plugin-next";
+import reactHooksPlugin from "eslint-plugin-react-hooks";
 
 const eslintConfig = [
   {
@@ -27,6 +28,7 @@ const eslintConfig = [
     plugins: {
       "@typescript-eslint": tsPlugin,
       "@next/next": nextPlugin,
+      "react-hooks": reactHooksPlugin,
     },
     rules: {
       "no-unused-vars": "off",
@@ -35,6 +37,7 @@ const eslintConfig = [
       "@typescript-eslint/no-require-imports": "off",
       "@next/next/no-html-link-for-pages": "off",
       "@next/next/no-img-element": "off",
+      "react-hooks/exhaustive-deps": "warn",
     },
   },
 ];
