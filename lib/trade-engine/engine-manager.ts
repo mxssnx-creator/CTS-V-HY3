@@ -273,14 +273,14 @@ export class TradeEngineManager {
       
       // Initialize progression state in Redis if not exists
       try {
-        const client = getRedisClient()
+         const client = getRedisClient()
         const existingProgression = await client.hgetall(`progression:${this.connectionId}`)
         const nowMs = Date.now()
         if (!existingProgression || Object.keys(existingProgression).length === 0) {
           // First time initialization - set all counters to 0 and stamp the
-          // canonical `started_at` epoch-ms. The stats route uses this for
-          // rolling-window rate calculations; absent it falls back to
-          // "now - 1h", which under-reports the very first hour after start.
+          // canonical `started_at` epoch-ms. We also initialize all counters
+          // to prevent undefined/null values when statistics are read during
+          // engine startup before any actual processing occurs.
           await client.hset(`progression:${this.connectionId}`, {
             cycles_completed: "0",
             successful_cycles: "0",
@@ -289,6 +289,52 @@ export class TradeEngineManager {
             last_update: new Date().toISOString(),
             engine_started: "true",
             started_at: String(nowMs),
+            // Initialize all per-processor cycle counters
+            indication_cycle_count: "0",
+            indication_live_cycle_count: "0",
+            strategy_cycle_count: "0",
+            strategy_live_cycle_count: "0",
+            realtime_cycle_count: "0",
+            realtime_live_cycle_count: "0",
+            frames_processed: "0",
+            // Initialize indication count fields
+            indications_count: "0",
+            indications_direction_count: "0",
+            indications_move_count: "0",
+            indications_active_count: "0",
+            indications_active_advanced_count: "0",
+            indications_optimal_count: "0",
+            indications_auto_count: "0",
+            // Initialize strategy count fields
+            strategies_count: "0",
+            strategies_base_total: "0",
+            strategies_base_evaluated: "0",
+            strategies_main_total: "0",
+            strategies_main_evaluated: "0",
+            strategies_real_total: "0",
+            strategies_real_evaluated: "0",
+            strategies_live_total: "0",
+            // Initialize trade/profit fields
+            total_trades: "0",
+            successful_trades: "0",
+            total_profit: "0",
+            // Initialize live execution fields
+            live_volume_usd_total: "0",
+            live_margin_usd_total: "0",
+            live_positions_created_count: "0",
+            live_positions_closed_count: "0",
+            live_orders_placed_count: "0",
+            live_orders_filled_count: "0",
+            live_orders_failed_count: "0",
+            live_orders_rejected_count: "0",
+            live_orders_accumulated_count: "0",
+            live_wins_count: "0",
+            // Initialize prehistoric fields
+            prehistoric_symbols_processed_count: "0",
+            prehistoric_candles_processed: "0",
+            // Initialize success rate fields to prevent undefined
+            cycle_success_rate: "100",
+            trade_success_rate: "100",
           })
         } else {
           // Engine restarted - preserve existing counters, only update metadata.

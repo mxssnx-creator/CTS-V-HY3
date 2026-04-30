@@ -155,8 +155,10 @@ export async function GET(
     const historicSymbolsTotal =
       n(prehistoricHash.symbols_total) ||
       symbolsFromArray ||
-      historicSymbolsProcessed ||
       n(es.config_set_symbols_total) ||
+      // Only use processed count as last resort if nothing else is available
+      // (historicSymbolsProcessed is a COUNT of processed symbols, not the TOTAL)
+      (historicSymbolsProcessed > 0 ? historicSymbolsProcessed : 0) ||
       1  // Last resort fallback
     const historicCandlesLoaded = pick(
       n(prehistoricHash.candles_loaded),
