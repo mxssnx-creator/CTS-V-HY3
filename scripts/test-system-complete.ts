@@ -9,6 +9,24 @@ import fetch from 'node-fetch'
 
 const API_BASE = process.env.API_URL || 'http://localhost:3000'
 
+interface ProgressionData {
+  phase: string;
+  progress: number;
+  cyclesCompleted?: number;
+  signalsCount?: number;
+  running?: boolean;
+  lastUpdate?: string;
+  indicationsCount?: number;
+  stratCount?: number;
+}
+
+interface ConnectionData {
+  id: string;
+  connection_name: string;
+  has_credentials: boolean;
+  [key: string]: any;
+}
+
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -32,8 +50,8 @@ async function main() {
     // STEP 2: Get BingX connection
     console.log('[STEP 2] Getting BingX Connection Details...')
     const connRes = await fetch(`${API_BASE}/api/settings/connections`)
-    const connections = await connRes.json()
-    const bingx = connections.find((c: any) => c.id === 'bingx-x01')
+    const connections = await connRes.json() as ConnectionData[]
+    const bingx = connections.find((c: ConnectionData) => c.id === 'bingx-x01')
     
     if (!bingx) throw new Error('BingX connection not found')
     console.log(`✓ Found: ${bingx.connection_name}`)
@@ -77,7 +95,7 @@ async function main() {
 
     while (currentPhaseIndex < phases.length && (Date.now() - startMonitor) < maxWaitTime) {
       const progRes = await fetch(`${API_BASE}/api/connections/progression/bingx-x01`)
-      const progData = await progRes.json()
+      const progData = await progRes.json() as ProgressionData
 
       const currentPhase = phases[currentPhaseIndex]
       
@@ -111,7 +129,7 @@ async function main() {
     })
 
     if (liveRes.ok) {
-      const liveData = await liveRes.json()
+      const liveData = await liveRes.json() as { is_live_trade: boolean }
       console.log(`✓ Live Trading Enabled: ${liveData.is_live_trade}`)
       console.log(`✓ Status Badge: GREEN (Live)\n`)
     } else {
@@ -125,7 +143,7 @@ async function main() {
     const posRes = await fetch(`${API_BASE}/api/exchange-positions?connection_id=bingx-x01`)
     
     if (posRes.ok) {
-      const positions = await posRes.json()
+      const positions = await posRes.json() as any[]
       console.log(`✓ Active Positions: ${positions.length}`)
       
       if (positions.length > 0) {
@@ -146,7 +164,7 @@ async function main() {
     
     console.log('[STEP 7] Final System Status Check...')
     const finalProgRes = await fetch(`${API_BASE}/api/connections/progression/bingx-x01`)
-    const finalProgData = await finalProgRes.json()
+    const finalProgData = await finalProgRes.json() as ProgressionData
 
     console.log(`Engine Running:        ${finalProgData.running ? '✓ YES' : '✗ NO'}`)
     console.log(`Current Phase:         ${finalProgData.phase}`)
@@ -155,7 +173,7 @@ async function main() {
     console.log(`Indications:           ${finalProgData.indicationsCount || 0}`)
     console.log(`Strategy Cycles:       ${finalProgData.stratCount || 0}`)
     console.log(`Signals Generated:     ${finalProgData.signalsCount || 0}`)
-    console.log(`Last Update:           ${new Date(finalProgData.lastUpdate).toLocaleTimeString()}`)
+    console.log(`Last Update:           ${new Date(finalProgData.lastUpdate || '').toLocaleTimeString()}`)
 
     await logSection('TEST COMPLETED SUCCESSFULLY')
     

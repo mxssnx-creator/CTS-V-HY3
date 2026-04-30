@@ -120,7 +120,7 @@ async function runTest() {
       positions: connLog.summary?.enginePerformance?.totalTrades
     };
 
-    console.log(`  [${(i+1)*10}s] CPU: ${mon.cpu}% | MEM: ${mon.memory}% | Cycles: ${currentCycles} | Rate: ${cyclesPerMinute}/min | Indications: ${Object.values(connLog.summary?.indicationsCounts || {}).reduce((a: number, b: number) => a + b, 0)}`);
+     console.log(`  [${(i+1)*10}s] CPU: ${mon.cpu}% | MEM: ${mon.memory}% | Cycles: ${currentCycles} | Rate: ${cyclesPerMinute}/min | Indications: ${Object.values(connLog.summary?.indicationsCounts || {}).reduce((a: number, b: unknown) => (a as number) + (b as number), 0)}`);
     lastCycleCount = currentCycles;
   }
 
@@ -136,7 +136,7 @@ async function runTest() {
   RESULTS.summary = {
     testDuration: `${((Date.now() - new Date(RESULTS.startTime).getTime()) / 1000 / 60).toFixed(1)} minutes`,
     totalCycles: finalConn.summary?.enginePerformance?.cyclesCompleted,
-    totalIndications: Object.values(finalConn.summary?.indicationsCounts || {}).reduce((a: number, b: number) => a + b, 0),
+     totalIndications: Object.values(finalConn.summary?.indicationsCounts || {}).reduce((a: number, b: unknown) => (a as number) + (b as number), 0),
     totalStrategiesEvaluated: Object.values(finalConn.summary?.strategyCounts || {}).reduce((a: number, b: any) => a + b.evaluated, 0),
     cycleSuccessRate: finalConn.summary?.enginePerformance?.cycleSuccessRate,
     averageCycleTime: finalConn.summary?.enginePerformance?.cycleTimeMs,

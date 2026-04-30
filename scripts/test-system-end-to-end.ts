@@ -57,10 +57,10 @@ async function testMarketDataPersistence() {
     }
     
     console.log("Saving market data for", testSymbol)
-    await saveMarketData(testSymbol, testData)
+    await saveMarketData(testSymbol, "1m", testData)
     
     console.log("Retrieving market data...")
-    const retrieved = await getMarketData(testSymbol)
+    const retrieved = await getMarketData(testSymbol, "1m")
     
     if (retrieved && typeof retrieved === "object") {
       console.log("✓ Market data saved and retrieved for", testSymbol)
@@ -97,7 +97,7 @@ async function testPreStartupSeeding() {
     let marketDataCount = 0
     
     for (const symbol of symbols) {
-      const data = await getMarketData(symbol)
+      const data = await getMarketData(symbol, "1m")
       if (data && typeof data === "object") {
         marketDataCount += 1
         console.log(`✓ ${symbol}: data available`)
@@ -145,7 +145,7 @@ async function testAPIEndpoints() {
     // Test market data endpoint
     const marketDataResponse = await fetch(`${BASE_URL}/api/market-data?symbol=BTCUSDT&limit=10`)
     if (marketDataResponse.ok) {
-      const data = await marketDataResponse.json()
+      const data = await marketDataResponse.json() as any
       console.log("✓ GET /api/market-data: PASS -", data.data?.length || 0, "records")
     } else {
       console.log("✗ GET /api/market-data: FAIL - Status:", marketDataResponse.status)

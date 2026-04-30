@@ -20,6 +20,25 @@ import { promises as fs } from 'fs'
 const API_BASE = process.env.API_URL || 'http://localhost:3000'
 const TEST_CONNECTION_ID = 'bingx-x01' // BingX connection
 
+interface ProgressionData {
+  phase: string;
+  progress: number;
+  cyclesCompleted?: number;
+  signalsCount?: number;
+  stratCount?: number;
+  prehistoricStatus?: string;
+  indicationsCount?: number;
+  symbolsCount?: number;
+  running?: boolean;
+}
+
+interface ConnectionData {
+  id: string;
+  connection_name: string;
+  has_credentials: boolean;
+  [key: string]: any;
+}
+
 interface TestResult {
   phase: string
   status: 'PASS' | 'FAIL' | 'PENDING'
@@ -71,8 +90,8 @@ class SystemProgressionTester {
 
       // Check connection exists
       const connRes = await fetch(`${API_BASE}/api/settings/connections`)
-      const connections = await connRes.json()
-      const bingxConn = connections.find((c: any) => c.id === TEST_CONNECTION_ID)
+      const connections = await connRes.json() as ConnectionData[]
+      const bingxConn = connections.find((c: ConnectionData) => c.id === TEST_CONNECTION_ID)
       
       if (!bingxConn) {
         throw new Error(`BingX connection ${TEST_CONNECTION_ID} not found`)
@@ -125,7 +144,7 @@ class SystemProgressionTester {
         throw new Error(`Failed to start engine: ${engineRes.status}`)
       }
 
-      const engineData = await engineRes.json()
+      const engineData = await engineRes.json() as any
       console.log('✓ Trade engine started')
       console.log(`✓ Engine components initialized: indication, strategy, realtime processors\n`)
 
@@ -153,7 +172,7 @@ class SystemProgressionTester {
 
       // Check progression
       const progRes = await fetch(`${API_BASE}/api/connections/progression/${TEST_CONNECTION_ID}`)
-      const progData = await progRes.json()
+      const progData = await progRes.json() as ProgressionData
 
       console.log(`✓ Current phase: ${progData.phase}`)
       console.log(`✓ Progress: ${progData.progress}%`)
@@ -183,7 +202,7 @@ class SystemProgressionTester {
       await new Promise(resolve => setTimeout(resolve, 2000))
 
       const progRes = await fetch(`${API_BASE}/api/connections/progression/${TEST_CONNECTION_ID}`)
-      const progData = await progRes.json()
+      const progData = await progRes.json() as ProgressionData
 
       console.log(`✓ Historical data loading status: ${progData.prehistoricStatus || 'in progress'}`)
       console.log(`✓ Progress: ${progData.progress}%`)
@@ -211,7 +230,7 @@ class SystemProgressionTester {
       await new Promise(resolve => setTimeout(resolve, 3000))
 
       const progRes = await fetch(`${API_BASE}/api/connections/progression/${TEST_CONNECTION_ID}`)
-      const progData = await progRes.json()
+      const progData = await progRes.json() as ProgressionData
 
       console.log(`✓ Indication cycles: ${progData.cyclesCompleted || 0}`)
       console.log(`✓ Indications processed: ${progData.indicationsCount || 'pending'}`)
@@ -241,7 +260,7 @@ class SystemProgressionTester {
       await new Promise(resolve => setTimeout(resolve, 3000))
 
       const progRes = await fetch(`${API_BASE}/api/connections/progression/${TEST_CONNECTION_ID}`)
-      const progData = await progRes.json()
+      const progData = await progRes.json() as ProgressionData
 
       console.log(`✓ Strategy cycles: ${progData.stratCount || 0}`)
       console.log(`✓ Signals generated: ${progData.signalsCount || 0}`)
@@ -278,20 +297,20 @@ class SystemProgressionTester {
       if (!liveRes.ok) {
         console.log('ℹ Live trading toggle: not required for test (can use simulated mode)')
       } else {
-        const liveData = await liveRes.json()
+        const liveData = await liveRes.json() as any
         console.log(`✓ Live trading enabled: ${liveData.is_live_trade}`)
       }
 
       // Get current positions/pseudo positions
       const posRes = await fetch(`${API_BASE}/api/exchange-positions?connection_id=${TEST_CONNECTION_ID}`)
       if (posRes.ok) {
-        const positions = await posRes.json()
+        const positions = await posRes.json() as any[]
         console.log(`✓ Active positions: ${positions.length || 0}`)
       }
 
       // Get progression state
       const progRes = await fetch(`${API_BASE}/api/connections/progression/${TEST_CONNECTION_ID}`)
-      const progData = await progRes.json()
+      const progData = await progRes.json() as ProgressionData
 
       console.log(`✓ Engine status: ${progData.running ? 'running' : 'ready'}`)
       console.log(`✓ Current progress: ${progData.progress}%`)
