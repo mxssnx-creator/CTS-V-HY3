@@ -1,5 +1,13 @@
 # Context
 
+## 2026-04-30 (Historic Symbols Fix + TypeScript Strict Mode Fix)
+- **HISTORIC SYMBOLS FIX**: Fixed "Quick Start Historic Symbols Shows 1/1 while N selected" issue by ensuring `symbols_total` is always set in the `prehistoric:{connId}` Redis hash across all write paths:
+  - `engine-manager.ts` `runPrehistoricProcessing()`: Now writes `symbols_total` on initial hash setup (line 792)
+  - `engine-manager.ts` completion update: Now writes `symbols_total` on completion (line 832) 
+  - `config-set-processor.ts` already had correct `symbols_total` write (unchanged)
+  - `quick-start/route.ts` already had correct `symbols_total` write (unchanged)
+  - Stats endpoint (`app/api/connections/progression/[id]/stats/route.ts`) uses `historicSymbolsTotal` as primary source from `prehistoricHash.symbols_total`
+
 ## 2026-04-30 (TypeScript Strict Mode Fix)
 - **TYPE SYSTEM**: Fixed all TypeScript strict mode type errors in test scripts:
   - `test-system-complete.ts`: Added `as ProgressionData`, `as ConnectionData[]` type assertions for `fetch().json()` calls (returns `unknown` in strict mode)

@@ -789,6 +789,7 @@ export class TradeEngineManager {
         range_hours: String(rangeHours),
         range_days: String(storedRangeDays),
         timeframe_seconds: String(storedTimeframeSec),
+        symbols_total: String(symbols.length),
         is_complete: "0",
         started_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -828,6 +829,7 @@ export class TradeEngineManager {
       // Mark prehistoric hash as complete
       await redisClient.hset(`prehistoric:${this.connectionId}`, {
         is_complete: "1",
+        symbols_total: String(processingResult.symbolsTotal),
         symbols_processed: String(processingResult.symbolsProcessed),
         candles_loaded: String(processingResult.candlesProcessed),
         indicators_calculated: String(processingResult.indicationResults),
