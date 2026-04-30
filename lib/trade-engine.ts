@@ -41,6 +41,7 @@ console.log(`[v0] Global Trade Engine V${COORDINATOR_VERSION} loading with cache
 
 import { TradeEngineManager, type EngineConfig } from "./trade-engine/engine-manager"
 import { getSettings, setSettings } from "./redis-db"
+import { getEngineMode, type EngineMode } from "./engine-mode"
 
 // Re-export TradeEngine class and config from subdirectory for convenient imports
 export { TradeEngine, type TradeEngineConfig, TRADE_SERVICE_NAME } from "./trade-engine/trade-engine"
@@ -146,6 +147,8 @@ export class GlobalTradeEngineCoordinator {
    * PHASE 1 FIX: Added startup lock to prevent duplicate engines
    */
   async startEngine(connectionId: string, config: EngineConfig): Promise<void> {
+    const engineMode = getEngineMode()
+    
     // Self-heal background timers on every public entry-point — see
     // `ensureBackgroundTimers` doc-block. No-op if already armed.
     this.ensureBackgroundTimers()
@@ -190,8 +193,27 @@ export class GlobalTradeEngineCoordinator {
       }
 
       // Step 5: Start the engine
-      await manager.start(config)
-      console.log(`[v0] [STARTUP LOCK] TradeEngine successfully started for connection: ${connectionId}`)
+      // In serverless mode, DON'T start setTimeout loops (they die when function is killed)
+      // Just mark as "running" in Redis - cron job will do the actual work
+      if (engineMode === "serverless") {
+        console.log(`[v0] [STARTUP LOCK] Serverless mode: skipping setTimeout loops for ${connectionId}`)
+        console.log(`[v0] [STARTUP LOCK] Engine marked as running (cron will do the work)`)
+        // Mark as running in Redis so the dashboard shows correct state
+        const { setSettings, getRedisClient } = await import("@/lib/redis-db")
+        await setSettings(`trade_engine_state:${connectionId}`, {
+          status: "running",
+          engine_mode: "serverless",
+          updated_at: new Date().toISOString(),
+        })
+        await getRedisClient().hset("trade_engine:global", {
+          status: "running",
+          engine_mode: "serverless",
+        })
+      } else {
+        // Long-running mode: start the engine with setTimeout loops
+        await manager.start(config)
+        console.log(`[v0] [STARTUP LOCK] TradeEngine successfully started for connection: ${connectionId}`)
+      }
     } finally {
       // Step 6: Remove from lock set (always, even on error)
       this.startingEngines.delete(connectionId)

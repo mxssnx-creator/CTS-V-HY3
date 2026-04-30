@@ -1,21 +1,36 @@
 # Context
 
-## 2026-04-30 (Engine Stability Fix + ESLint React Hooks Fix)
-- **ENGINE STABILITY FIX**: Fixed engine stopping due to `aborted` flag in indication processor:
-  - Removed `aborted = true` logic that prevented timer rescheduling on "totalStrategiesEvaluated" errors
-  - Engine now ALWAYS reschedules next cycle (unless `this.isRunning` is false)
-  - This prevents engines from silently stopping after errors
-- **ESLINT FIX**: Fixed `react-hooks/exhaustive-deps` rule not found error:
+## 2026-04-30 (Dual-Mode Engine Architecture - Serverless Fix)
+- **DUAL-MODE ARCHITECTURE**: Fixed serverless process killing issue comprehensively:
+  - Added `ENGINE_MODE` env var (`long-running` | `serverless`) in `lib/engine-mode.ts`
+  - **Serverless mode**: Cron job runs ONE cycle of work (no setTimeout loops that die)
+  - **Long-running mode**: Uses setTimeout loops as before (for VPS/Docker)
+  - Created `lib/trade-engine/engine-cycle.ts` with standalone cycle functions:
+    - `runIndicationCycle(connectionId)`: Runs ONE indication cycle
+    - `runStrategyCycle(connectionId)`: Runs ONE strategy cycle
+    - `runRealtimeCycle(connectionId)`: Runs ONE realtime cycle
+    - `runAllCycles(connectionId)`: Runs all three cycles
+  - Updated `app/api/cron/engine-auto-start/route.ts`:
+    - In serverless mode: Calls cycle functions directly (no setTimeout loops)
+    - In long-running mode: Starts engines with setTimeout loops as before
+  - Updated `lib/trade-engine.ts` (coordinator):
+    - `startEngine()` now checks engine mode
+    - In serverless mode: Marks engine as "running" in Redis (no setTimeout loops)
+    - Cron job handles actual work
+  - All state persisted in Redis between invocations
+- **ENGINE STABILITY FIX**: Fixed engine stopping due to `aborted` flag:
+  - Removed `aborted = true` logic in indication processor
+  - Engine now ALWAYS reschedules next cycle
+- **ESLINT FIX**: Fixed `react-hooks/exhaustive-deps` rule:
   - Installed `eslint-plugin-react-hooks@7.1.1`
-  - Updated `eslint.config.mjs` to import and register the plugin
-  - Added `"react-hooks/exhaustive-deps": "warn"` rule to ESLint config
-- **VERIFICATION**: `bun lint` now passes with no errors (only warnings remain for `no-explicit-any` and `no-unused-vars`)
+  - Updated `eslint.config.mjs` with react-hooks plugin
 - **TYPECHECK**: `bun typecheck` passes with 0 errors
 - **BUILD**: `npm run build` succeeds (169 pages generated)
-- **DEPLOYMENT NOTE**: Created DEPLOYMENT_GUIDE.md for VPS deployment
-  - Vercel serverless kills processes after ~5-15 minutes, causing engine restarts
-  - For continuous engine processing, deploy to VPS with systemd or PM2
-  - Alternatively, increase Vercel cron frequency to reduce downtime
+- **DATABASE**: Migrations comprehensive (16 migrations in `lib/redis-migrations.ts`)
+  - Runs automatically on startup via `database.ts`
+  - Supports rollback with `rollbackMigration()`
+  - Migration status available via `getMigrationStatus()`
+- **VERIFICATION**: All changes verified with typecheck and build
 
 ## 2026-04-30 (Historic Symbols Fix + TypeScript Strict Mode Fix)
 - **HISTORIC SYMBOLS FIX**: Fixed "Quick Start Historic Symbols Shows 1/1 while N selected" issue by ensuring `symbols_total` is always set in the `prehistoric:{connId}` Redis hash across all write paths:
