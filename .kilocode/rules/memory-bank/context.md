@@ -1,6 +1,10 @@
 # Context
 
-## 2026-04-30 (ESLint React Hooks Fix)
+## 2026-04-30 (Engine Stability Fix + ESLint React Hooks Fix)
+- **ENGINE STABILITY FIX**: Fixed engine stopping due to `aborted` flag in indication processor:
+  - Removed `aborted = true` logic that prevented timer rescheduling on "totalStrategiesEvaluated" errors
+  - Engine now ALWAYS reschedules next cycle (unless `this.isRunning` is false)
+  - This prevents engines from silently stopping after errors
 - **ESLINT FIX**: Fixed `react-hooks/exhaustive-deps` rule not found error:
   - Installed `eslint-plugin-react-hooks@7.1.1`
   - Updated `eslint.config.mjs` to import and register the plugin
@@ -8,6 +12,10 @@
 - **VERIFICATION**: `bun lint` now passes with no errors (only warnings remain for `no-explicit-any` and `no-unused-vars`)
 - **TYPECHECK**: `bun typecheck` passes with 0 errors
 - **BUILD**: `npm run build` succeeds (169 pages generated)
+- **DEPLOYMENT NOTE**: Created DEPLOYMENT_GUIDE.md for VPS deployment
+  - Vercel serverless kills processes after ~5-15 minutes, causing engine restarts
+  - For continuous engine processing, deploy to VPS with systemd or PM2
+  - Alternatively, increase Vercel cron frequency to reduce downtime
 
 ## 2026-04-30 (Historic Symbols Fix + TypeScript Strict Mode Fix)
 - **HISTORIC SYMBOLS FIX**: Fixed "Quick Start Historic Symbols Shows 1/1 while N selected" issue by ensuring `symbols_total` is always set in the `prehistoric:{connId}` Redis hash across all write paths:

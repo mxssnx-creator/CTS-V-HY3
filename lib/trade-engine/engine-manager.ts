@@ -1252,18 +1252,12 @@ export class TradeEngineManager {
         } catch { /* ignore errors */ }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
-
-        // Suppress known stale closure errors from HMR - these will clear on server restart
+        
+        // Log known stale closure errors from HMR - these will clear on server restart
         if (errorMessage.includes("totalStrategiesEvaluated is not defined")) {
-          // Self-heal: clear this stale timer and do NOT reschedule
-          aborted = true
-          if (this.indicationTimer) {
-            clearTimeout(this.indicationTimer)
-            console.log("[v0] Cleared stale indication timer with totalStrategiesEvaluated error")
-          }
-          return
+          console.warn("[v0] Stale totalStrategiesEvaluated error (non-fatal, continuing loop):", errorMessage)
         }
-
+        
         errorCount++
         this.componentHealth.indications.errorCount++
         // Track failed cycle on every error to keep progression counters accurate.
@@ -1281,8 +1275,9 @@ export class TradeEngineManager {
         )
         console.error("[v0] Indication processor error:", error)
       } finally {
-        // Schedule next cycle after configurable pause so the event loop can breathe.
-        if (!aborted) scheduleNext(producedIndications)
+        // ALWAYS reschedule the next cycle unless engine is stopped.
+        // This ensures the engine continues running even after errors.
+        if (this.isRunning) scheduleNext(producedIndications)
       }
     }
 
