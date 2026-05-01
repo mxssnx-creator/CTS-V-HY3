@@ -467,6 +467,12 @@ export class StrategyCoordinator {
       }
     }
 
+    // totalCreated = number of (type × direction × variant) groups we attempted
+    // Compute BEFORE writes array (before try block) so cumulative increments can reference it
+    const totalGroups = setMap.size * variantPasses.length
+    // passedEvaluation = number of sets actually created (had entries passing PF >= 1.0)
+    const passed = baseSets.length
+
     // Persist BASE sets
     const baseKey = `strategies:${this.connectionId}:${symbol}:base:sets`
     await setSettings(baseKey, { sets: baseSets, count: baseSets.length, created: new Date() })
@@ -499,21 +505,19 @@ export class StrategyCoordinator {
           avg_profit_factor: String(baseAvgPF.toFixed(4)),
           avg_drawdown_time: String(Math.round(baseAvgDDT)),
           avg_pos_per_set:   String(baseAvgPosPerSet.toFixed(2)),
-          evaluated:         String(baseSets.length),
-          passed_sets:       "0",   // will be updated by createMainSets
+          evaluated:         String(totalGroups),
+          passed_sets:       String(baseSets.length),
           entries_total:     String(baseEntriesTotal),
           updated_at:        String(Date.now()),
         }),
         client.expire(detailKey, 86400),
         client.set(`strategies:${this.connectionId}:base:count`, String(baseSets.length)),
-        client.set(`strategies:${this.connectionId}:base:evaluated`, String(baseSets.length)),
-        client.expire(`strategies:${this.connectionId}:base:count`, 86400),
+        client.set(`strategies:${this.connectionId}:base:evaluated`, String(totalGroups)),
         client.expire(`strategies:${this.connectionId}:base:evaluated`, 86400),
       ]
-      if (baseSets.length > 0) {
-        writes.push(client.hincrby(redisKey, "strategies_base_total", baseSets.length))
-        writes.push(client.hincrby(redisKey, "strategies_base_evaluated", baseSets.length))
-      }
+      // Fix: strategies_base_total = cumulative INPUT (totalGroups), not OUTPUT (baseSets.length)
+      if (totalGroups > 0) writes.push(client.hincrby(redisKey, "strategies_base_total", totalGroups))
+      if (baseSets.length > 0) writes.push(client.hincrby(redisKey, "strategies_base_evaluated", baseSets.length))
 
       // ── ACTIVE-NOW snapshot per (symbol, stage) ───────────────────────
       // The cumulative `strategies_base_total` hincrby above answers
@@ -533,10 +537,6 @@ export class StrategyCoordinator {
 
     console.log(`[v0] [StrategyFlow] ${symbol} BASE: ${baseSets.length} Sets created (${baseSets.reduce((s, set) => s + set.entryCount, 0)} total entries)`)
 
-    // totalCreated = number of (type × direction × variant) groups we attempted
-    const totalGroups = setMap.size * variantPasses.length
-    // passedEvaluation = number of sets actually created (had entries passing PF >= 1.0)
-    const passed = baseSets.length
     return {
       result: {
         type: "base",

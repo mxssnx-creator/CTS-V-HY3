@@ -754,20 +754,17 @@ export async function GET(
     const activeStratTotal = activeStratByStage.base + activeStratByStage.main + activeStratByStage.real
 
     // Strategy per-stage counts
+    // ONLY use cumulative counters from progression hash. The per-symbol keys
+    // (`strategies:{id}:{type}:count`) are snapshots overwritten each cycle
+    // with the LAST symbol's data, causing "jumping to 1 Symbol" when
+    // the cumulative counter is 0 or the snapshot value is picked by Math.max.
     const stratTypes = ["base", "main", "real", "live"] as const
     const stratCounts: Record<string, number> = {}
     const stratEvaluated: Record<string, number> = {}
-    await Promise.all(
-      stratTypes.map(async (type) => {
-        const fromHash  = n(progHash[`strategies_${type}_total`])
-        const fromKey   = n(await client.get(`strategies:${connectionId}:${type}:count`).catch(() => 0))
-        stratCounts[type] = Math.max(fromHash, fromKey)
-
-        const evalFromHash = n(progHash[`strategies_${type}_evaluated`])
-        const evalFromKey  = n(await client.get(`strategies:${connectionId}:${type}:evaluated`).catch(() => 0))
-        stratEvaluated[type] = Math.max(evalFromHash, evalFromKey)
-      })
-    )
+    for (const type of stratTypes) {
+      stratCounts[type] = n(progHash[`strategies_${type}_total`]) || 0
+      stratEvaluated[type] = n(progHash[`strategies_${type}_evaluated`]) || 0
+    }
     // ── Pipeline-aware "total strategies" ────────────────────────────────
     // Base → Main → Real → Live is a CASCADE FILTER (eval → filter → adjust).
     // Each stage operates on the output of the previous stage, so the SAME
