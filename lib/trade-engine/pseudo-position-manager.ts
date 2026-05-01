@@ -90,19 +90,15 @@ export class PseudoPositionManager {
       return cached.value
     }
     try {
-      // Use the mirror-aware app-settings reader so the operator's saved
-      // value applies whether it was written to the canonical
-      // (`app_settings`) or legacy (`all_settings`) hash.
-      const s = await getAppSettings()
-      const raw = s.maxActiveBasePseudoPositionsPerDirection
-      const parsed = Number(raw)
-      const value =
-        Number.isFinite(parsed) && parsed >= 1
-          ? Math.floor(parsed)
-          : PseudoPositionManager.DEFAULT_DIRECTION_CAP
+      // Calculate cap based on Base strategy config sets (Strategies Base Config Ranges Possible Sets)
+      const strategyManager = new StrategyConfigManager(this.connectionId)
+      const enabledConfigs = await strategyManager.getEnabledConfigs()
+      const configCount = enabledConfigs.length
+      const value = configCount > 0 ? configCount : PseudoPositionManager.DEFAULT_DIRECTION_CAP
       PseudoPositionManager.directionCapCache = { value, ts: now, version: liveVersion }
       return value
-    } catch {
+    } catch (err) {
+      console.warn(`[v0] [PseudoPosMgr] Failed to get strategy config count for direction cap:`, err)
       // Fail-safe — cap to the spec default so we never exceed 1 on a
       // transient Redis error rather than silently uncapping.
       return PseudoPositionManager.DEFAULT_DIRECTION_CAP
@@ -273,6 +269,22 @@ export class PseudoPositionManager {
         return null
       }
 
+      // Accumulate volume for the same direction (Base Sets independent of accumulations)
+      const activePositionsInDirection = await this.listPositions({ 
+        status: "active", 
+        side: params.side 
+      })
+      const existingVolume = activePositionsInDirection.reduce((sum, pos) => {
+        const qty = parseFloat(pos.quantity || "0")
+        return sum + (isFinite(qty) ? qty : 0)
+      }, 0)
+      const accumulatedVolume = existingVolume + volumeCalc.finalVolume
+
+      // Use accumulated volume as the position's quantity
+      if (volumeCalc.finalVolume !== undefined) {
+        volumeCalc.finalVolume = accumulatedVolume
+      }
+
       // Calculate take profit and stop loss prices
       const takeProfitPrice =
         params.side === "long"
@@ -285,7 +297,7 @@ export class PseudoPositionManager {
           : params.entryPrice * (1 + params.stoplossRatio / 100)
 
       // Calculate position cost
-      const positionCost = (volumeCalc.finalVolume * params.entryPrice) / volumeCalc.leverage
+      const positionCost = (volumeCalc.finalVolume! * params.entryPrice) / volumeCalc.leverage
 
       // Store position in Redis
       const id = nanoid()

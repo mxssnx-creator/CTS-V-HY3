@@ -123,13 +123,18 @@ export interface ProgressionState {
   indicationsOptimalCount?: number
   indicationsAutoCount?: number
   
-  // Strategy count sets and evaluated counts
-  strategiesBaseTotal?: number
-  strategiesMainTotal?: number
-  strategiesRealTotal?: number
-  strategyEvaluatedBase?: number
-  strategyEvaluatedMain?: number
-  strategyEvaluatedReal?: number
+   // Strategy count sets and evaluated counts
+   strategiesBaseTotal?: number
+   strategiesMainTotal?: number
+   strategiesRealTotal?: number
+   strategyEvaluatedBase?: number
+   strategyEvaluatedMain?: number
+   strategyEvaluatedReal?: number
+
+   // Main position counts related to Base validated sets (Previous, Last, Continuous)
+   mainPrevPosCount?: number
+   mainLastPosCount?: number
+   mainContinuousCount?: number
   
   // Engine performance metrics
   cycleTimeMs?: number
@@ -205,12 +210,15 @@ export class ProgressionStateManager {
          indicationsActiveAdvancedCount: parseInt(data.indications_active_advanced_count || "0", 10),
          indicationsOptimalCount: parseInt(data.indications_optimal_count || "0", 10),
          indicationsAutoCount: parseInt(data.indications_auto_count || "0", 10),
-         strategiesBaseTotal: parseInt(data.strategies_base_total || "0", 10),
-         strategiesMainTotal: parseInt(data.strategies_main_total || "0", 10),
-         strategiesRealTotal: parseInt(data.strategies_real_total || "0", 10),
-         strategyEvaluatedBase: parseInt(data.strategies_base_evaluated || "0", 10),
-         strategyEvaluatedMain: parseInt(data.strategies_main_evaluated || "0", 10),
-         strategyEvaluatedReal: parseInt(data.strategies_real_evaluated || "0", 10),
+          strategiesBaseTotal: parseInt(data.strategies_base_total || "0", 10),
+          strategiesMainTotal: parseInt(data.strategies_main_total || "0", 10),
+          strategiesRealTotal: parseInt(data.strategies_real_total || "0", 10),
+          strategyEvaluatedBase: parseInt(data.strategies_base_evaluated || "0", 10),
+          strategyEvaluatedMain: parseInt(data.strategies_main_evaluated || "0", 10),
+          strategyEvaluatedReal: parseInt(data.strategies_real_evaluated || "0", 10),
+          mainPrevPosCount: parseInt(data.strategies_main_prev_pos_count || "0", 10),
+          mainLastPosCount: parseInt(data.strategies_main_last_pos_count || "0", 10),
+          mainContinuousCount: parseInt(data.strategies_main_continuous_count || "0", 10),
          cycleTimeMs: parseInt(data.cycle_time_ms || "0", 10),
          intervalsProcessed: parseInt(data.intervals_processed || "0", 10),
          indicationsCount: parseInt(data.indications_count || "0", 10),
@@ -261,9 +269,12 @@ export class ProgressionStateManager {
       strategiesBaseTotal: 0,
       strategiesMainTotal: 0,
       strategiesRealTotal: 0,
-      strategyEvaluatedBase: 0,
-      strategyEvaluatedMain: 0,
-      strategyEvaluatedReal: 0,
+       strategyEvaluatedBase: 0,
+       strategyEvaluatedMain: 0,
+       strategyEvaluatedReal: 0,
+       mainPrevPosCount: 0,
+       mainLastPosCount: 0,
+       mainContinuousCount: 0,
       cycleTimeMs: 0,
       intervalsProcessed: 0,
       indicationsCount: 0,

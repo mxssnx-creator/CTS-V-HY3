@@ -751,7 +751,12 @@ export class StrategyCoordinator {
       const mainAvgPosPerSet = mainSets.length > 0 ? mainEntriesTotal / mainSets.length : 0
 
       const writes: Promise<any>[] = [
-        client.hset(redisKey, "strategies_main_current", String(mainSets.length)),
+        client.hset(redisKey, {
+          strategies_main_current: String(mainSets.length),
+          strategies_main_prev_pos_count: String(ctx.prevPosCount),
+          strategies_main_last_pos_count: String(ctx.lastPosCount),
+          strategies_main_continuous_count: String(ctx.continuousCount),
+        }),
         client.expire(redisKey, 7 * 24 * 60 * 60),
         client.hset(mainDetailKey, {
           created_sets:      String(mainSets.length),
