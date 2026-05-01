@@ -1,5 +1,14 @@
 # Context
 
+## 2026-05-01 (Progression Symbol Count Fix - COMPLETE)
+- **PROGRESSION CRASH FIX**: Fixed "Processing 10/10 Symbols then crashing to 1" issue:
+  - Removed flawed logic in `app/api/connections/progression/[id]/route.ts` that incorrectly set `processed = 1` when `processed === 0` and `currentSymbol` existed
+  - Changed `config-set-processor.ts` to use `hincrby` for `symbols_processed` in `prehistoric:${connectionId}` hash for atomic increments
+  - Removed redundant `symbols_processed` from `hset` calls in both `config-set-processor.ts` and `engine-manager.ts`
+  - Ensures counter consistency across engine restarts (no longer overwrites with cumulative count from local variable)
+- **TYPECHECK/LINT**: 0 errors, passes clean.
+- **COMMIT**: Changes committed as `532d813` and pushed to main.
+
 ## 2026-05-01 (Production Mode Verification - COMPLETE)
 - **VERIFICATION COMPLETE**: All systems verified working in production mode:
   - ✓ TypeScript typecheck passes (0 errors)
