@@ -1,5 +1,14 @@
 # Context
 
+## 2026-05-01 (Strategy Evaluation Numbers Fix - COMPLETE)
+- **STRATEGY EVALUATION FIXES**: Fixed incorrect evaluation numbers in `strategy-coordinator.ts`:
+  - **Base stage**: `totalCreated` now correctly uses `totalGroups` (attempted = setMap.size × variantPasses.length) instead of `baseSets.length` (passed). `passedEvaluation` correctly reflects actual output count. `failedEvaluation` = `totalGroups - passed`.
+  - **Main stage**: `totalCreated` = `baseSets.length` (input), `passedEvaluation` = `mainSets.length` (output after PF >= 1.2 filter). `failedEvaluation` = `baseSets.length - uniqueBaseSetsProduced.size`.
+  - **Real stage**: Fixed `real:evaluated` Redis key to use `realSets.length` (output) instead of `mainSets.length` (input). Cumulative counter `strategies_real_evaluated` now increments by `realSets.length`.
+  - **Numbers verification**: Base "eval 4/2" = `passedEvaluation/totalCreated` from single cycle. "3.1K sets" = cumulative `strategies_base_total`. Correct behavior.
+- **TYPECHECK/LINT**: 0 errors, passes clean.
+- **COMMIT**: Changes committed as `be70cd2` and pushed to main.
+
 ## 2026-05-01 (Strategy Progression & Position Handling Fixes - COMPLETE)
 - **PSEUDO POSITION PER-DIRECTION LIMIT**: Modified `pseudo-position-manager.ts` to calculate per-direction cap based on Base strategy config sets (replaced hardcoded 1 limit). Now uses `StrategyConfigManager.getEnabledConfigs().length` as cap (e.g., 3x3x3 config = 27 positions per direction).
 - **VOLUME ACCUMULATION**: Added logic to accumulate position volume per direction. New positions now sum volumes of existing active positions in the same direction, ensuring continuous accumulation independent of Base config sets.
