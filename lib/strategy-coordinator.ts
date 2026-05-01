@@ -533,15 +533,19 @@ export class StrategyCoordinator {
 
     console.log(`[v0] [StrategyFlow] ${symbol} BASE: ${baseSets.length} Sets created (${baseSets.reduce((s, set) => s + set.entryCount, 0)} total entries)`)
 
+    // totalCreated = number of (type × direction × variant) groups we attempted
+    const totalGroups = setMap.size * variantPasses.length
+    // passedEvaluation = number of sets actually created (had entries passing PF >= 1.0)
+    const passed = baseSets.length
     return {
       result: {
         type: "base",
         symbol,
         timestamp: new Date(),
-        totalCreated: baseSets.length,
-        passedEvaluation: baseSets.length,
-        failedEvaluation: 0,
-        avgProfitFactor: baseSets.length > 0 ? baseSets.reduce((s, set) => s + set.avgProfitFactor, 0) / baseSets.length : 0,
+        totalCreated: totalGroups,
+        passedEvaluation: passed,
+        failedEvaluation: totalGroups - passed,
+        avgProfitFactor: passed > 0 ? baseSets.reduce((s, set) => s + set.avgProfitFactor, 0) / passed : 0,
         avgDrawdownTime: 0,
       },
       sets: baseSets,
@@ -1079,7 +1083,7 @@ export class StrategyCoordinator {
           pass_rate:   String(passRatioReal.toFixed(4)),
         }).catch(() => {}),
         client.set(`strategies:${this.connectionId}:real:count`, String(realSets.length)),
-        client.set(`strategies:${this.connectionId}:real:evaluated`, String(mainSets.length)),
+        client.set(`strategies:${this.connectionId}:real:evaluated`, String(realSets.length)),
         client.set(`strategies:${this.connectionId}:main:passed`, String(realSets.length)),
         client.expire(`strategies:${this.connectionId}:real:count`, 86400),
         client.expire(`strategies:${this.connectionId}:real:evaluated`, 86400),
