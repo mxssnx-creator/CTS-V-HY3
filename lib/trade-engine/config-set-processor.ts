@@ -260,18 +260,20 @@ export class ConfigSetProcessor {
         candlesProcessed += combinedCandles.length
         symbolsProcessed++
 
-        // --- Write live progress to Redis hash (fire concurrently with computation) ---
-        const progressWrite = Promise.all([
-          client.hincrby(progressKey, "prehistoric_candles_processed", combinedCandles.length),
-          client.hincrby(progressKey, "prehistoric_symbols_processed_count", 1),
-          client.hset(progressKey, {
-            prehistoric_current_symbol: symbol,
-            prehistoric_intervals_processed: String(totalIntervalsProcessed),
-            prehistoric_missing_loaded: String(missingIntervalsLoaded),
-            prehistoric_timeframe_seconds: String(timeframeSec),
-          }),
-          client.expire(progressKey, 7 * 24 * 60 * 60),
-        ]).catch(() => { /* non-critical */ })
+          // --- Write live progress to Redis hash (fire concurrently with computation) ---
+         const progressWrite = Promise.all([
+           client.hincrby(progressKey, "prehistoric_candles_processed", combinedCandles.length),
+           client.hincrby(progressKey, "prehistoric_symbols_processed_count", 1),
+           client.hincrby(`prehistoric:${this.connectionId}`, "symbols_processed", 1),
+           client.hset(progressKey, {
+             prehistoric_current_symbol: symbol,
+             prehistoric_intervals_processed: String(totalIntervalsProcessed),
+             prehistoric_missing_loaded: String(missingIntervalsLoaded),
+             prehistoric_timeframe_seconds: String(timeframeSec),
+           }),
+           client.expire(progressKey, 7 * 24 * 60 * 60),
+           client.expire(`prehistoric:${this.connectionId}`, 7 * 24 * 60 * 60),
+         ]).catch(() => { /* non-critical */ })
 
         // --- Run indications + strategies in parallel for this symbol ---
         const tCalcStart = Date.now()
@@ -346,7 +348,6 @@ export class ConfigSetProcessor {
           client.expire(`prehistoric:${this.connectionId}:symbols`, 86400),
           client.hset(`prehistoric:${this.connectionId}`, {
             candles_loaded: String(candlesProcessed),
-            symbols_processed: String(symbolsProcessed),
             intervals_processed: String(totalIntervalsProcessed),
             missing_intervals: String(missingIntervalsLoaded),
           }),

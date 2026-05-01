@@ -830,7 +830,6 @@ export class TradeEngineManager {
       await redisClient.hset(`prehistoric:${this.connectionId}`, {
         is_complete: "1",
         symbols_total: String(processingResult.symbolsTotal),
-        symbols_processed: String(processingResult.symbolsProcessed),
         candles_loaded: String(processingResult.candlesProcessed),
         indicators_calculated: String(processingResult.indicationResults),
         total_duration_ms: String(totalPrehistoricDurationMs),

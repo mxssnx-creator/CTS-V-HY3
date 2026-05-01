@@ -227,26 +227,27 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           }
 
           // symbolsProcessed — canonical source of truth, in priority order:
-          //   1. Hash field `symbols_processed` (written by engine-manager /
-          //      config-set-processor on each symbol completion)
-          //   2. SCARD of the `prehistoric:{id}:symbols` SADD set
-          //   3. Legacy `:*:completed` key scan (never written since v5 but
-          //      kept for back-compat during migrations)
-          //   4. Fall back to 1 if currently processing a symbol
-          const hashProcessed = Number(prehistoricData.symbols_processed || 0)
-          const setProcessed = processedSet.length
-          let processed = Math.max(hashProcessed, setProcessed)
-          if (processed === 0) {
-            const legacyCompleted = await client
-              .keys(`prehistoric:${connectionId}:*:completed`)
-              .catch(() => [] as string[])
-            processed = Array.isArray(legacyCompleted) ? legacyCompleted.length : 0
-          }
-          if (processed === 0 && prehistoricProgress.currentSymbol) processed = 1
-          prehistoricProgress.symbolsProcessed = Math.min(
-            processed,
-            prehistoricProgress.symbolsTotal,
-          )
+           //   1. Hash field `symbols_processed` (written by engine-manager /
+           //      config-set-processor on each symbol completion)
+           //   2. SCARD of the `prehistoric:{id}:symbols` SADD set
+           //   3. Legacy `:*:completed` key scan (never written since v5 but
+           //      kept for back-compat during migrations)
+           const hashProcessed = Number(prehistoricData.symbols_processed || 0)
+           const setProcessed = processedSet.length
+           let processed = Math.max(hashProcessed, setProcessed)
+           if (processed === 0) {
+             const legacyCompleted = await client
+               .keys(`prehistoric:${connectionId}:*:completed`)
+               .catch(() => [] as string[])
+             processed = Array.isArray(legacyCompleted) ? legacyCompleted.length : 0
+           }
+           // Removed flawed logic that set processed=1 when currentSymbol existed.
+           // This was causing the UI to display "1" incorrectly when the actual
+           // processed count was 0 but a current symbol was being processed.
+           prehistoricProgress.symbolsProcessed = Math.min(
+             processed,
+             prehistoricProgress.symbolsTotal,
+           )
 
           // isComplete → either explicit flag, `:done` marker, or all symbols processed.
            const isComplete =
