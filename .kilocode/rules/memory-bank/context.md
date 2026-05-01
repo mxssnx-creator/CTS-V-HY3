@@ -1,5 +1,18 @@
 # Context
 
+## 2026-05-01 (Strategy Counters & Stats Fix - COMPLETE)
+- **COUNTER LOGIC FIX**: Fixed `strategy-coordinator.ts`:
+  - `totalGroups` declaration moved BEFORE `try` block (line 472) so `writes` array can reference it
+  - `strategies_base_total` now incremented by `totalGroups` (INPUT = attempted) instead of `baseSets.length` (OUTPUT = passed)
+  - `evaluated` field in `strategy_detail:*:base` now uses `totalGroups` (INPUT)
+  - `passed_sets` field uses `baseSets.length` (OUTPUT = passed)
+- **STATS ROUTE FIX**: Fixed `app/api/connections/progression/[id]/stats/route.ts`:
+  - Removed `Math.max(fromHash, fromKey)` logic which caused "jumping to 1 Symbol"
+  - Now ONLY reads cumulative counters from progression hash (`strategies_${type}_total`, `strategies_${type}_evaluated`)
+  - Per-symbol keys (`strategies:{id}:${type}:count`) no longer used (they were snapshots overwritten each cycle)
+- **TYPECHECK/LINT**: 0 errors, passes clean.
+- **COMMIT**: Changes committed as `d91f251` and pushed to main.
+
 ## 2026-05-01 (Strategy Evaluation Numbers Fix - COMPLETE)
 - **STRATEGY EVALUATION FIXES**: Fixed incorrect evaluation numbers in `strategy-coordinator.ts`:
   - **Base stage**: `totalCreated` now correctly uses `totalGroups` (attempted = setMap.size × variantPasses.length) instead of `baseSets.length` (passed). `passedEvaluation` correctly reflects actual output count. `failedEvaluation` = `totalGroups - passed`.
