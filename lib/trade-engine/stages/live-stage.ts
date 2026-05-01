@@ -26,6 +26,7 @@ import { getRedisClient, initRedis } from "@/lib/redis-db"
 import { logProgressionEvent } from "@/lib/engine-progression-logs"
 import { VolumeCalculator } from "@/lib/volume-calculator"
 import { SystemLogger } from "@/lib/system-logger"
+import { PseudoPositionManager } from "@/lib/trade-engine/pseudo-position-manager"
 import type { RealPosition } from "./real-stage"
 
 const LOG_PREFIX = "[v0] [LivePositionStage]"
@@ -171,6 +172,11 @@ async function savePosition(pos: LivePosition): Promise<void> {
     const openIndexKey   = `live:positions:${pos.connectionId}`
     const closedIndexKey = `live:positions:${pos.connectionId}:closed`
     const indexedMarker  = `live:positions:${pos.connectionId}:indexed:${pos.id}`
+    const directionKey   = `live:positions:${pos.connectionId}:direction:${pos.direction}`
+
+    // Track live positions per direction for cap enforcement
+    const isActive = pos.status === "open" || pos.status === "placed" || pos.status === "partially_filled" || pos.status === "filled"
+    const isTerminal = pos.status === "closed" || pos.status === "error" || pos.status === "rejected"
 
     // 1. Write the position snapshot
     await client.setex(key, 604800, JSON.stringify(pos))
@@ -191,14 +197,15 @@ async function savePosition(pos: LivePosition): Promise<void> {
       _indexedInMemory.add(pos.id)
     }
 
-    // 3. When a position reaches a terminal status, move it out of the open
+    // 3. Track per-direction count for cap enforcement
+    if (isActive) {
+      await client.sadd(directionKey, pos.id).catch(() => {})
+      await client.expire(directionKey, 604800).catch(() => {})
+    }
+
+    // 4. When a position reaches a terminal status, move it out of the open
     // index and into the closed archive so getLivePositions() only scans
     // currently-active records (major performance win for long-running apps).
-    const isTerminal =
-      pos.status === "closed" ||
-      pos.status === "error" ||
-      pos.status === "rejected"
-
     if (isTerminal) {
       const movedMarker = `live:positions:${pos.connectionId}:moved:${pos.id}`
       const alreadyMoved = await client.get(movedMarker).catch(() => null)
@@ -211,6 +218,8 @@ async function savePosition(pos: LivePosition): Promise<void> {
           client.ltrim(closedIndexKey, 0, 4999).catch(() => {}),
           client.expire(closedIndexKey, 30 * 24 * 60 * 60).catch(() => {}),
           client.setex(movedMarker, 604800, "1").catch(() => {}),
+          // Remove from direction set
+          client.srem(directionKey, pos.id).catch(() => {}),
         ])
       }
     }
@@ -1006,6 +1015,56 @@ export async function executeLivePosition(
 ): Promise<LivePosition> {
   await initRedis()
   const client = getRedisClient()
+
+  // ── Per-Direction Cap Check for Live Positions ─────────────────────
+  // Live positions get a HIGHER cap (3x base sets count) compared to
+  // pseudo positions. This allows more live positions per direction.
+  try {
+    const maxLivePerDirection = await PseudoPositionManager.getMaxLivePositionsPerDirectionStatic(connectionId)
+    const directionKey = `live:positions:${connectionId}:direction:${realPosition.direction}`
+    const currentCount = await client.scard(directionKey)
+    if (Number(currentCount) >= maxLivePerDirection) {
+      const rejected: LivePosition = {
+        id: `live:${connectionId}:${realPosition.symbol}:${realPosition.direction}:${Date.now()}`,
+        connectionId,
+        symbol: realPosition.symbol,
+        direction: realPosition.direction,
+        realPositionId: realPosition.id,
+        quantity: realPosition.quantity,
+        executedQuantity: 0,
+        remainingQuantity: realPosition.quantity,
+        entryPrice: realPosition.entryPrice,
+        averageExecutionPrice: 0,
+        volumeUsd: 0,
+        leverage: realPosition.leverage,
+        marginType: "cross",
+        stopLoss: realPosition.stopLoss,
+        takeProfit: realPosition.takeProfit,
+        assignedStopLoss: realPosition.stopLoss,
+        assignedTakeProfit: realPosition.takeProfit,
+        status: "rejected",
+        statusReason: `Per-direction cap reached (${currentCount}/${maxLivePerDirection} for ${realPosition.direction})`,
+        fills: [],
+        progression: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        setKey: realPosition.setKey,
+        parentSetKey: realPosition.parentSetKey,
+        setVariant: realPosition.setVariant,
+        axisWindows: realPosition.axisWindows,
+        accumulatedSetKeys: realPosition.setKey ? [realPosition.setKey] : [],
+      }
+      pushStep(rejected, "preflight", false, rejected.statusReason)
+      logProgressionEvent(connectionId, "live_trading", "warning", rejected.statusReason!, {
+        symbol: realPosition.symbol,
+        direction: realPosition.direction,
+      }).catch(() => {})
+      return rejected
+    }
+  } catch (err) {
+    console.warn(`${LOG_PREFIX} Failed to check per-direction cap:`, err)
+    // Fail-open: continue without cap check on Redis error
+  }
 
   // ── Non-recoverable-error cooldown gate ──
   //

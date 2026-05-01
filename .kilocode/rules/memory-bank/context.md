@@ -1,5 +1,21 @@
 # Context
 
+## 2026-05-01 (Per-Direction Cap Fix - COMPLETE)
+- **PER-DIRECTION CAP FIX**: Modified `pseudo-position-manager.ts` to calculate max positions per direction based on Base Pseudo Position Sets count (not overall enabled configs):
+  - Added `getBaseSetsCount()` method to count Base Sets from `strategies_active:{connectionId}` Redis hash
+  - Modified `getMaxActivePerDirection()` to use Base Sets count instead of `enabledConfigs.length`
+  - Added `LIVE_POSITIONS_MULTIPLIER = 3` - live positions get 3x higher cap than pseudo positions
+  - Added `getMaxLivePositionsPerDirectionStatic()` static method for live-stage.ts to get higher cap
+- **LIVE POSITIONS PER-DIRECTION CAP**: Added higher counts for live positions:
+  - Added per-direction cap check in `executeLivePosition()` in `live-stage.ts`
+  - Returns "rejected" LivePosition if per-direction cap is reached
+  - Cap = Base Sets count × 3 (multiplier)
+- **DIRECTION TRACKING**: Added tracking for live positions per direction:
+  - Modified `savePosition()` to add position to direction set when status is active (open/placed/partially_filled/filled)
+  - Removes from direction set when position becomes terminal (closed/error/rejected)
+  - Uses Redis sets (`live:positions:{connId}:direction:{side}`) for O(1) counting
+- **TYPECHECK/LINT**: 0 errors, passes clean.
+
 ## 2026-05-01 (Progression Symbol Count Fix - COMPLETE)
 - **PROGRESSION CRASH FIX**: Fixed "Processing 10/10 Symbols then crashing to 1" issue:
   - Removed flawed logic in `app/api/connections/progression/[id]/route.ts` that incorrectly set `processed = 1` when `processed === 0` and `currentSymbol` existed
