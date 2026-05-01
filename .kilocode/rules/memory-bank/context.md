@@ -1,5 +1,12 @@
 # Context
 
+## 2026-05-01 (Strategy Progression & Position Handling Fixes - COMPLETE)
+- **PSEUDO POSITION PER-DIRECTION LIMIT**: Modified `pseudo-position-manager.ts` to calculate per-direction cap based on Base strategy config sets (replaced hardcoded 1 limit). Now uses `StrategyConfigManager.getEnabledConfigs().length` as cap (e.g., 3x3x3 config = 27 positions per direction).
+- **VOLUME ACCUMULATION**: Added logic to accumulate position volume per direction. New positions now sum volumes of existing active positions in the same direction, ensuring continuous accumulation independent of Base config sets.
+- **MAIN POSITION TRACKING**: Added `mainPrevPosCount`, `mainLastPosCount`, `mainContinuousCount` fields to `ProgressionState` and updated `progression-state-manager.ts` to persist these. `strategy-coordinator.ts` now writes these counts (from `PositionContext`) to the progression hash.
+- **TYPECHECK/LINT**: All type errors fixed, lint passes with 0 errors.
+- **COMMIT**: Changes committed as `e7d492c` and pushed to main.
+
 ## 2026-04-30 (Production Mode Verification - COMPLETE)
 - **PRODUCTION VERIFICATION COMPLETE**: All systems verified working in production mode:
   - ✓ TypeScript typecheck passes (0 errors)
