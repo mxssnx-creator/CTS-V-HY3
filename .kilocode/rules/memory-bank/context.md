@@ -1,5 +1,18 @@
 # Context
 
+## 2026-05-02 (Strict 1-Position Limit Per Config - COMPLETE)
+- **STRICT 1-POSITION LIMIT**: Enforced per (symbol, setKey, direction):
+  - MAX 1 position per symbol + base set config + direction combination
+  - Direction key: `live:positions:{connId}:cap:{symbol}:{setKey}:{direction}`
+  - Removed LIVE_POSITIONS_MULTIPLIER (no longer needed)
+  - Removed `getMaxLivePositionsPerDirectionStatic()` from pseudo-position-manager.ts
+  - Removed unused PseudoPositionManager import from live-stage.ts
+- **PER-DIRECTION LIMIT**: Now relies on Base Pseudo Position Sets count
+  - `getMaxActivePerDirection()` uses `getBaseSetsCount()` (from strategies_active hash)
+  - Each Base Strategy with its config value is independent
+- **TYPECHECK/LINT**: 0 errors, passes clean.
+- **COMMIT**: Changes committed as `0b22d59` and pushed to main.
+
 ## 2026-05-02 (Per-Direction Cap Fix v2 - COMPLETE)
 - **PER-DIRECTION CAP INDEPENDENCE**: Fixed per-direction cap to be INDEPENDENT per (symbol, setKey, direction):
   - Changed direction key from `live:positions:{connId}:direction:{direction}` (global) to `live:positions:{connId}:cap:{symbol}:{setKey}:{direction}` (independent)
