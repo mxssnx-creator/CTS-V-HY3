@@ -1,8 +1,8 @@
 # Context
 
 ## 2026-05-02 (Strict 1-Position Limit Per Config - COMPLETE)
-- **STRICT 1-POSITION LIMIT**: Enforced per (symbol, setKey, direction):
-  - MAX 1 position per symbol + base set config + direction combination
+- **STRICT 1-POSITION LIMIT**: Enforced per (symbol, indication type, Base Set, config):
+  - MAX 1 position per symbol + indication type + Base Set + config combination
   - Direction key: `live:positions:{connId}:cap:{symbol}:{setKey}:{direction}`
   - Removed LIVE_POSITIONS_MULTIPLIER (no longer needed)
   - Removed `getMaxLivePositionsPerDirectionStatic()` from pseudo-position-manager.ts
