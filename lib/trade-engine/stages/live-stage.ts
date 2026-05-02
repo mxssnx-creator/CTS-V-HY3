@@ -172,7 +172,9 @@ async function savePosition(pos: LivePosition): Promise<void> {
     const closedIndexKey = `live:positions:${pos.connectionId}:closed`
     const indexedMarker  = `live:positions:${pos.connectionId}:indexed:${pos.id}`
     // Per-symbol, per-setKey, per-direction key for strict 1-position limit
-    const directionKey   = `live:positions:${pos.connectionId}:cap:${pos.symbol}:${pos.setKey}:${pos.direction}`
+    // Fallback to "default" if setKey is undefined
+    const safeSetKey = pos.setKey || "default"
+    const directionKey   = `live:positions:${pos.connectionId}:cap:${pos.symbol}:${safeSetKey}:${pos.direction}`
 
     // Track live positions per (symbol, setKey, direction) for strict 1-position enforcement
     const isActive = pos.status === "open" || pos.status === "placed" || pos.status === "partially_filled" || pos.status === "filled"
@@ -1017,10 +1019,10 @@ export async function executeLivePosition(
   const client = getRedisClient()
 
   // ── Per-Direction Cap Check for Live Positions ─────────────────────
-  // Strict limit: MAX 1 position per (symbol, setKey, direction) combination.
-  // Each symbol + base set config + direction can have ONLY 1 active live position.
+  // Strict limit: MAX 1 position per (symbol, indication type, Base Set, config) combination.
   try {
-    const directionKey = `live:positions:${connectionId}:cap:${realPosition.symbol}:${realPosition.setKey}:${realPosition.direction}`
+    const setKey = realPosition.setKey || "default"
+    const directionKey = `live:positions:${connectionId}:cap:${realPosition.symbol}:${setKey}:${realPosition.direction}`
     const currentCount = await client.scard(directionKey)
     if (Number(currentCount) >= 1) {
       const rejected: LivePosition = {
