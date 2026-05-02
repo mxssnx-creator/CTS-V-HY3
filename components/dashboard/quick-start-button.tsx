@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -14,6 +14,8 @@ import { QuickstartTestProcedureDialog } from "./quickstart-test-procedure-dialo
 import { QuickstartFullSystemTestDialog } from "./quickstart-full-system-test-dialog"
 import { EngineProcessingLogDialog } from "./engine-processing-log-dialog"
 import { useExchange } from "@/lib/exchange-context"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import type { Connection } from "@/lib/db-types"
 
 interface QuickStartButtonProps {
   onQuickStartComplete?: () => void
@@ -83,14 +85,52 @@ export function QuickStartButton({ onQuickStartComplete }: QuickStartButtonProps
   const [isRunning, setIsRunning] = useState(false)
   const [functionalOverview, setFunctionalOverview] = useState<FunctionalOverview | null>(null)
   const [overallStats, setOverallStats] = useState<OverallStats | null>(null)
+  const [availableConnections, setAvailableConnections] = useState<Connection[]>([])
+  const [selectedConnId, setSelectedConnId] = useState<string>("")
+  const [selectedConnSymbols, setSelectedConnSymbols] = useState<string[]>([])
   const [steps, setSteps] = useState<QuickStartStep[]>([
     { id: "init",    name: "Initialize System",              status: "pending" },
     { id: "migrate", name: "Run Migrations",                 status: "pending" },
-    { id: "test",    name: "Verify BingX Credentials",       status: "pending" },
+    { id: "test",    name: "Verify Connection Credentials",   status: "pending" },
     { id: "start",   name: "Start Global Trade Engine",      status: "pending" },
-    { id: "enable",  name: "Enable BingX (BTCUSDT)",         status: "pending" },
+    { id: "enable",  name: "Enable Main Connection",          status: "pending" },
     { id: "engine",  name: "Launch Engine + Progression",    status: "pending" },
   ])
+
+  // Fetch available Main Connections on mount
+  useEffect(() => {
+    const fetchConnections = async () => {
+      try {
+        const res = await fetch("/api/settings/connections", { cache: "no-store" })
+        if (!res.ok) return
+        const data = await res.json()
+        const conns: Connection[] = Array.isArray(data) ? data : (data.connections || [])
+        // Filter for Main Connections (assigned) with credentials
+        const mainConns = conns.filter(c => 
+          (c.is_assigned === "1" || c.is_assigned === true) &&
+          c.api_key && c.api_secret && c.api_key.length >= 10
+        )
+        setAvailableConnections(mainConns)
+        if (mainConns.length > 0 && !selectedConnId) {
+          setSelectedConnId(mainConns[0].id)
+          setSelectedConnSymbols(mainConns[0].active_symbols ? JSON.parse(mainConns[0].active_symbols as string) : [])
+        }
+      } catch (err) {
+        console.error("Failed to fetch connections:", err)
+      }
+    }
+    fetchConnections()
+  }, [])
+
+  // Update selected connection symbols when selection changes
+  useEffect(() => {
+    if (!selectedConnId) return
+    const conn = availableConnections.find(c => c.id === selectedConnId)
+    if (conn) {
+      const syms = conn.active_symbols ? JSON.parse(conn.active_symbols as string) : []
+      setSelectedConnSymbols(syms)
+    }
+  }, [selectedConnId, availableConnections])
 
   const updateStep = (stepId: string, status: QuickStartStep["status"], message?: string) => {
     setSteps(prev => prev.map(s => s.id === stepId ? { ...s, status, message } : s))
@@ -127,6 +167,10 @@ export function QuickStartButton({ onQuickStartComplete }: QuickStartButtonProps
     ])
 
   const handleQuickStart = async () => {
+    if (availableConnections.length > 0 && !selectedConnId) {
+      toast.error("Please select a Main Connection first")
+      return
+    }
     setIsRunning(true)
     setFunctionalOverview(null)
     setSteps(prev => prev.map(s => ({ ...s, status: "pending", message: undefined })))
@@ -149,14 +193,14 @@ export function QuickStartButton({ onQuickStartComplete }: QuickStartButtonProps
         return `${n} migration(s) applied`
       })
 
-      // STEP 3: Verify BingX (non-critical - never blocks)
+      // STEP 3: Verify Connection (non-critical - never blocks)
       let balanceInfo = ""
-      await runStep("test", "STEP 3: Verify BingX Credentials", async () => {
+      await runStep("test", "STEP 3: Verify Connection Credentials", async () => {
         const res = await timedFetch("/api/settings/connections/test-bingx", { method: "GET" }, 20000)
         const d = await res.json().catch(() => ({}))
         if (d.success) {
           balanceInfo = d.connection?.testBalance ? ` | Balance: ${d.connection.testBalance}` : ""
-          return `Ready - ${d.connection?.name ?? "BingX"}${balanceInfo}`
+          return `Ready - ${d.connection?.name ?? "Connection"}${balanceInfo}`
         }
         return `Credentials check: ${d.error ?? "skipped"}`
       })
@@ -170,13 +214,19 @@ export function QuickStartButton({ onQuickStartComplete }: QuickStartButtonProps
         return `Coordinator running${n > 0 ? ` | Resumed ${n}` : ""}`
       }, true)
 
-      // STEP 5: Enable BingX with 1 symbol (REQUIRED)
+      // STEP 5: Enable selected Main Connection (REQUIRED)
       let quickStartResponse: any = null
-      await runStep("enable", "STEP 5: Enable BingX (1 Symbol)", async () => {
+      await runStep("enable", "STEP 5: Enable Main Connection", async () => {
+        const conn = availableConnections.find(c => c.id === selectedConnId)
+        const symbolsToUse = selectedConnSymbols.length > 0 ? selectedConnSymbols : undefined
         const res = await timedFetch("/api/trade-engine/quick-start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "enable", symbols: ["BTCUSDT"] }),
+          body: JSON.stringify({ 
+            action: "enable", 
+            connectionId: selectedConnId,
+            symbols: symbolsToUse
+          }),
         }, 25000)
         const d = await res.json().catch(() => ({}))
         quickStartResponse = d
@@ -191,12 +241,12 @@ export function QuickStartButton({ onQuickStartComplete }: QuickStartButtonProps
         }
         const syms = Array.isArray(d.connection?.symbols)
           ? d.connection.symbols.join(", ")
-          : "BTCUSDT"
+          : (conn?.active_symbols ? JSON.parse(conn.active_symbols as string).join(", ") : "default")
         return `${d.connection?.name} enabled | ${syms}`
       }, true)
 
       // STEP 6: Launch per-connection engine (non-critical fallback)
-      await runStep("engine", "STEP 6: Launch BingX Engine", async () => {
+      await runStep("engine", "STEP 6: Launch Connection Engine", async () => {
         const connId = enabledConnectionId
         if (!connId) return "Skipped - no connection ID"
         const res = await timedFetch(`/api/settings/connections/${connId}/live-trade`, {
@@ -209,7 +259,8 @@ export function QuickStartButton({ onQuickStartComplete }: QuickStartButtonProps
         return `Queued (${d.error ?? d.message ?? "coordinator processing"})`
       })
 
-      toast.success("Quick Start complete — BingX engine running with BTCUSDT.")
+      const completedConnName = enabledConnectionId ? availableConnections.find(c => c.id === enabledConnectionId)?.name ?? "Connection" : "Connection"
+        toast.success(`Quick Start complete — ${completedConnName} engine running with ${selectedConnSymbols.join(", ") || "default symbols"}.`)
 
       // Fetch functional overview in background
       try {
@@ -249,23 +300,47 @@ export function QuickStartButton({ onQuickStartComplete }: QuickStartButtonProps
 
   return (
     <Card className="border-blue-200 bg-blue-50">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Zap className="w-5 h-5 text-blue-600" />
-              Quick Start (BingX)
-            </CardTitle>
-            <CardDescription>
-              Initialize system, run migrations, test connection, enable BingX, and start trade engine in one click
-            </CardDescription>
-          </div>
-          <Badge variant="outline" className="text-xs">
-            {isRunning ? "Running..." : "Ready"}
-          </Badge>
-        </div>
-      </CardHeader>
+<CardHeader className="pb-3">
+         <div className="flex items-center justify-between">
+           <div>
+             <CardTitle className="text-lg flex items-center gap-2">
+               <Zap className="w-5 h-5 text-blue-600" />
+               Quick Start (Main Connection)
+             </CardTitle>
+             <CardDescription>
+               Initialize system, run migrations, test connection, enable selected Main Connection, and start trade engine in one click
+             </CardDescription>
+           </div>
+           <Badge variant="outline" className="text-xs">
+             {isRunning ? "Running..." : "Ready"}
+           </Badge>
+         </div>
+       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Connection Selection */}
+        {availableConnections.length > 0 && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Select Main Connection</label>
+            <Select value={selectedConnId} onValueChange={setSelectedConnId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a Main Connection" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableConnections.map(conn => (
+                  <SelectItem key={conn.id} value={conn.id}>
+                    {conn.name} ({conn.exchange}) {selectedConnSymbols.length > 0 ? `| Symbols: ${selectedConnSymbols.join(", ")}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedConnId && selectedConnSymbols.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Using symbols: {selectedConnSymbols.join(", ")}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Steps Progress */}
         <div className="space-y-2">
           {steps.map((step) => (
@@ -337,9 +412,9 @@ export function QuickStartButton({ onQuickStartComplete }: QuickStartButtonProps
           <ul className="list-disc list-inside space-y-1">
           <li>Initialize the complete system (preset types, connections)</li>
             <li>Run ALL database migrations (schema, indexes, TTL policies)</li>
-            <li>Test BingX API connection (verify credentials & check balance)</li>
+            <li>Test selected connection API (verify credentials & check balance)</li>
             <li>Start the trade engine</li>
-            <li>Enable BingX for active trading with BTCUSDT</li>
+            <li>Enable selected Main Connection with its configured symbols</li>
           </ul>
         </div>
 
