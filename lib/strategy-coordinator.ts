@@ -937,9 +937,12 @@ export class StrategyCoordinator {
     // previous cycle's value.
     try {
       const _client = getRedisClient()
-      await _client.hset(`strategies_active:${this.connectionId}`, {
-        [`${symbol}:main`]: String(mainSets.length),
-      })
+      // Per-set tracking for Main stage
+      for (const set of mainSets) {
+        await _client.hset(`strategies_active:${this.connectionId}`, {
+          [set.setKey]: String(mainSets.length),
+        })
+      }
       await _client.expire(`strategies_active:${this.connectionId}`, 600)
     } catch { /* non-critical */ }
 
@@ -1097,10 +1100,15 @@ export class StrategyCoordinator {
       // aggregates to a "Strategies (Real, alive now)" tile. Note this
       // is the COUNT-AFTER-SORT-AND-CAP, i.e. exactly what propagates
       // forward to Live evaluation — not the raw post-filter count.
+      // Per-set tracking: use setKey for unique progression.
+      for (const set of realSets) {
+        writes.push(
+          client.hset(`strategies_active:${this.connectionId}`, {
+            [set.setKey]: String(realSets.length),
+          }),
+        )
+      }
       writes.push(
-        client.hset(`strategies_active:${this.connectionId}`, {
-          [`${symbol}:real`]: String(realSets.length),
-        }),
         client.expire(`strategies_active:${this.connectionId}`, 600),
       )
 
@@ -1303,8 +1311,14 @@ export class StrategyCoordinator {
         )
       }
 
+      // Per-set tracking for Live stage (unique progression per set)
+      for (const set of qualifying) {
+        await client.hset(`strategies_active:${this.connectionId}`, {
+          [set.setKey]: String(qualifying.length),
+        })
+      }
+
       await Promise.all([
-        client.hset(redisKey, "strategies_live_total", String(qualifying.length)),
         client.expire(redisKey, 7 * 24 * 60 * 60),
         client.hset(liveDetailKey, {
           created_sets:      String(qualifying.length),
