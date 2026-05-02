@@ -1,5 +1,18 @@
 # Context
 
+## 2026-05-02 (Lower PF Thresholds + Enhanced Position Limit - COMPLETE)
+- **LOWER PF THRESHOLDS**: Reduced min Profit Factor to 0.6 for Base/Main/Real stages:
+  - `PF_BASE_MIN`: 1.0 → 0.6 (more base sets pass to Main)
+  - `PF_MAIN_MIN`: 1.2 → 0.6 (more main sets pass to Real)
+  - `PF_REAL_MIN`: 1.4 → 0.6 (more real sets pass to Live)
+  - Should increase strategy evaluations at each stage
+- **ENHANCED POSITION LIMIT**: Extended per-direction cap to include parentSetKey:
+  - Old: `live:positions:{connId}:cap:{symbol}:{setKey}:{direction}` (MAX 1 per symbol+setKey+direction)
+  - New: `live:positions:{connId}:cap:{symbol}:{setKey}:{parentSetKey}:{direction}` (MAX 1 per symbol+setKey+parentSetKey+direction)
+  - Allows independent positions for different Base Strategy sets
+  - Updated both `executeLivePosition()` and `savePosition()` in live-stage.ts
+- **TYPECHECK/LINT**: 0 errors, passes clean.
+
 ## 2026-05-02 (Strict 1-Position Limit Per Config - COMPLETE)
 - **STRICT 1-POSITION LIMIT**: Enforced per (symbol + indication type + config + Base Set + config):
   - MAX 1 position per symbol + indication type + config + Base Set + config combination

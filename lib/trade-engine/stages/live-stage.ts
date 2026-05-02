@@ -171,10 +171,11 @@ async function savePosition(pos: LivePosition): Promise<void> {
     const openIndexKey   = `live:positions:${pos.connectionId}`
     const closedIndexKey = `live:positions:${pos.connectionId}:closed`
     const indexedMarker  = `live:positions:${pos.connectionId}:indexed:${pos.id}`
-    // Per-symbol, per-setKey, per-direction key for strict 1-position limit
-    // Fallback to "default" if setKey is undefined
+    // Per-symbol, per-setKey, per-parentSetKey, per-direction key for strict 1-position limit
+    // Fallback to "default" if setKey is undefined, "base" if parentSetKey is undefined
     const safeSetKey = pos.setKey || "default"
-    const directionKey   = `live:positions:${pos.connectionId}:cap:${pos.symbol}:${safeSetKey}:${pos.direction}`
+    const safeParentKey = pos.parentSetKey || "base"
+    const directionKey   = `live:positions:${pos.connectionId}:cap:${pos.symbol}:${safeSetKey}:${safeParentKey}:${pos.direction}`
 
     // Track live positions per (symbol, setKey, direction) for strict 1-position enforcement
     const isActive = pos.status === "open" || pos.status === "placed" || pos.status === "partially_filled" || pos.status === "filled"
@@ -1019,10 +1020,11 @@ export async function executeLivePosition(
   const client = getRedisClient()
 
   // ── Per-Direction Cap Check for Live Positions ─────────────────────
-  // Strict limit: MAX 1 position per (symbol, indication type, Base Set, config) combination.
+  // Strict limit: MAX 1 position per (symbol + setKey + parentSetKey + direction) combination.
   try {
     const setKey = realPosition.setKey || "default"
-    const directionKey = `live:positions:${connectionId}:cap:${realPosition.symbol}:${setKey}:${realPosition.direction}`
+    const parentKey = realPosition.parentSetKey || "base"
+    const directionKey = `live:positions:${connectionId}:cap:${realPosition.symbol}:${setKey}:${parentKey}:${realPosition.direction}`
     const currentCount = await client.scard(directionKey)
     console.log(`${LOG_PREFIX} Per-direction check: ${directionKey} = ${currentCount}`)
     if (Number(currentCount) >= 1) {
