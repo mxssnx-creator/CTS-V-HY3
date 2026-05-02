@@ -1,5 +1,18 @@
 # Context
 
+## 2026-05-02 (Per-Direction Cap Fix v2 - COMPLETE)
+- **PER-DIRECTION CAP INDEPENDENCE**: Fixed per-direction cap to be INDEPENDENT per (symbol, setKey, direction):
+  - Changed direction key from `live:positions:{connId}:direction:{direction}` (global) to `live:positions:{connId}:cap:{symbol}:{setKey}:{direction}` (independent)
+  - Each symbol + base set config + direction now has its OWN separate cap
+  - Prevents over-restrictive global cap that was causing live position failures
+- **HIGHER LIVE POSITION COUNTS**: Live positions get 3x the base sets count (LIVE_POSITIONS_MULTIPLIER = 3)
+- **BASE PSEUDO SETS COUNT**: Per-direction cap relies on Base Pseudo Position Sets count (not overall configs):
+  - `getBaseSetsCount()` reads from `strategies_active:{connectionId}` Redis hash
+  - Sums all fields ending with `:base` to get total base sets count
+- **TRACKING UPDATES**: Updated `savePosition()` to use same per-symbol, per-setKey direction key
+- **TYPECHECK/LINT**: 0 errors, passes clean.
+- **COMMIT**: Changes committed as `7a9c23f` and pushed to main.
+
 ## 2026-05-01 (Per-Direction Cap Fix - COMPLETE)
 - **PER-DIRECTION CAP FIX**: Modified `pseudo-position-manager.ts` to calculate max positions per direction based on Base Pseudo Position Sets count (not overall enabled configs):
   - Added `getBaseSetsCount()` method to count Base Sets from `strategies_active:{connectionId}` Redis hash
