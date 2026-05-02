@@ -77,7 +77,6 @@ export class PseudoPositionManager {
   private static directionCapCache: { value: number; ts: number; version: number } | null = null
   private static readonly DIRECTION_CAP_HARD_REFRESH_MS = 30_000
   private static readonly DEFAULT_DIRECTION_CAP = 1
-  private static readonly LIVE_POSITIONS_MULTIPLIER = 3 // Live positions get 3x the base sets count
 
   /**
    * Get the number of Base Pseudo Position Sets from strategy coordinator.
@@ -120,30 +119,6 @@ export class PseudoPositionManager {
     } catch (err) {
       console.warn(`[v0] [PseudoPosMgr] Failed to get Base Sets count for direction cap:`, err)
       return PseudoPositionManager.DEFAULT_DIRECTION_CAP
-    }
-  }
-
-  /**
-   * Get max live positions per direction - returns a HIGHER count than pseudo positions
-   * by multiplying the base sets count with LIVE_POSITIONS_MULTIPLIER.
-   * Static version for use by live-stage.ts without instantiating PseudoPositionManager.
-   */
-  static async getMaxLivePositionsPerDirectionStatic(connectionId: string): Promise<number> {
-    try {
-      const client = getRedisClient()
-      const activeKey = `strategies_active:${connectionId}`
-      const allActive = await client.hgetall(activeKey) as Record<string, string>
-      let baseSetsCount = 0
-      for (const [field, value] of Object.entries(allActive || {})) {
-        if (field.endsWith(':base')) {
-          baseSetsCount += parseInt(value, 10) || 0
-        }
-      }
-      const multiplier = PseudoPositionManager.LIVE_POSITIONS_MULTIPLIER
-      return baseSetsCount > 0 ? baseSetsCount * multiplier : PseudoPositionManager.DEFAULT_DIRECTION_CAP * multiplier
-    } catch (err) {
-      console.warn(`[v0] [PseudoPosMgr] Failed to get Base Sets count for live positions:`, err)
-      return PseudoPositionManager.DEFAULT_DIRECTION_CAP * PseudoPositionManager.LIVE_POSITIONS_MULTIPLIER
     }
   }
 

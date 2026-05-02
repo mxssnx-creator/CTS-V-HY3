@@ -26,7 +26,6 @@ import { getRedisClient, initRedis } from "@/lib/redis-db"
 import { logProgressionEvent } from "@/lib/engine-progression-logs"
 import { VolumeCalculator } from "@/lib/volume-calculator"
 import { SystemLogger } from "@/lib/system-logger"
-import { PseudoPositionManager } from "@/lib/trade-engine/pseudo-position-manager"
 import type { RealPosition } from "./real-stage"
 
 const LOG_PREFIX = "[v0] [LivePositionStage]"
@@ -172,10 +171,10 @@ async function savePosition(pos: LivePosition): Promise<void> {
     const openIndexKey   = `live:positions:${pos.connectionId}`
     const closedIndexKey = `live:positions:${pos.connectionId}:closed`
     const indexedMarker  = `live:positions:${pos.connectionId}:indexed:${pos.id}`
-    // Per-symbol, per-setKey direction key for independent cap enforcement
+    // Per-symbol, per-setKey, per-direction key for strict 1-position limit
     const directionKey   = `live:positions:${pos.connectionId}:cap:${pos.symbol}:${pos.setKey}:${pos.direction}`
 
-    // Track live positions per direction for cap enforcement
+    // Track live positions per (symbol, setKey, direction) for strict 1-position enforcement
     const isActive = pos.status === "open" || pos.status === "placed" || pos.status === "partially_filled" || pos.status === "filled"
     const isTerminal = pos.status === "closed" || pos.status === "error" || pos.status === "rejected"
 
@@ -1018,14 +1017,12 @@ export async function executeLivePosition(
   const client = getRedisClient()
 
   // ── Per-Direction Cap Check for Live Positions ─────────────────────
-  // Cap is INDEPENDENT per (symbol, setKey, direction) combination.
-  // Each symbol + base set config + direction has its own separate cap.
+  // Strict limit: MAX 1 position per (symbol, setKey, direction) combination.
+  // Each symbol + base set config + direction can have ONLY 1 active live position.
   try {
-    const maxLivePerDirection = await PseudoPositionManager.getMaxLivePositionsPerDirectionStatic(connectionId)
-    // Key includes symbol and setKey to make cap independent for each
     const directionKey = `live:positions:${connectionId}:cap:${realPosition.symbol}:${realPosition.setKey}:${realPosition.direction}`
     const currentCount = await client.scard(directionKey)
-    if (Number(currentCount) >= maxLivePerDirection) {
+    if (Number(currentCount) >= 1) {
       const rejected: LivePosition = {
         id: `live:${connectionId}:${realPosition.symbol}:${realPosition.direction}:${Date.now()}`,
         connectionId,
@@ -1045,7 +1042,7 @@ export async function executeLivePosition(
         assignedStopLoss: realPosition.stopLoss,
         assignedTakeProfit: realPosition.takeProfit,
         status: "rejected",
-        statusReason: `Per-direction cap reached (${currentCount}/${maxLivePerDirection} for ${realPosition.symbol}:${realPosition.direction})`,
+        statusReason: `Per-direction limit reached (max 1 position for ${realPosition.symbol}:${realPosition.setKey}:${realPosition.direction})`,
         fills: [],
         progression: [],
         createdAt: Date.now(),
