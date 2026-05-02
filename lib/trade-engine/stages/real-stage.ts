@@ -250,6 +250,11 @@ function createRealPosition(
       consistencyRatio: ratios.consistency,
     },
     status: "ready",
+    // ── Set lineage (populated from MainPosition) ─────────────────────
+    setKey: mainPos.setKey,
+    parentSetKey: mainPos.parentSetKey,
+    setVariant: mainPos.setVariant,
+    axisWindows: mainPos.axisWindows,
   }
 }
 

@@ -1024,6 +1024,7 @@ export async function executeLivePosition(
     const setKey = realPosition.setKey || "default"
     const directionKey = `live:positions:${connectionId}:cap:${realPosition.symbol}:${setKey}:${realPosition.direction}`
     const currentCount = await client.scard(directionKey)
+    console.log(`${LOG_PREFIX} Per-direction check: ${directionKey} = ${currentCount}`)
     if (Number(currentCount) >= 1) {
       const rejected: LivePosition = {
         id: `live:${connectionId}:${realPosition.symbol}:${realPosition.direction}:${Date.now()}`,

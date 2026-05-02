@@ -34,6 +34,11 @@ export interface MainPosition {
     closedLastDay: number // Closed positions in last day
   }
   status: "active" | "paused" | "closed"
+  // ── Set lineage (populated when descending from StrategySet) ─────────
+  setKey?: string
+  parentSetKey?: string
+  setVariant?: "default" | "trailing" | "block" | "dca" | "pause"
+  axisWindows?: { prev: number; last: number; cont: number; pause: number }
 }
 
 /**
