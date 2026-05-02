@@ -185,8 +185,16 @@ export class ConfigSetProcessor {
         }
 
         if (candles.length === 0) {
-          console.log(`[v0] [ConfigSetProcessor] ⚠ no candles for ${symbol} — skipping`)
+          console.log(`[v0] [ConfigSetProcessor] ⚠ no candles for ${symbol} — marking as processed (no data)`)
           symbolsWithoutData++
+          symbolsProcessed++ // Count as processed even without data
+          
+          // Mark symbol as processed in the set so it doesn't get retried
+          try {
+            await client.sadd(`prehistoric:${this.connectionId}:symbols`, symbol)
+            await client.expire(`prehistoric:${this.connectionId}:symbols`, 86400)
+          } catch { /* non-critical */ }
+          
           await logProgressionEvent(this.connectionId, "config_set_symbol_skipped", "warning", `No prehistoric candles for ${symbol}`, {
             symbol,
             stage: "prehistoric",
@@ -379,20 +387,34 @@ export class ConfigSetProcessor {
       }
     }
 
-    // Fixed-size worker pool. We grab symbols off the queue as workers finish.
+    // Fixed-size worker pool for PARALLEL symbol processing.
+    // Each worker grabs symbols off the shared queue as it finishes.
+    // SYMBOL_CONCURRENCY controls how many symbols run in parallel.
+    console.log(
+      `[v0] [ConfigSetProcessor] Starting parallel processing: ` +
+      `${symbols.length} symbols with concurrency=${SYMBOL_CONCURRENCY}`
+    )
+    
     const queue = [...symbols]
     const workers: Promise<void>[] = []
-    const spawnWorker = async (): Promise<void> => {
+    const spawnWorker = async (workerId: number): Promise<void> => {
+      let processedByThisWorker = 0
       while (queue.length > 0) {
         const sym = queue.shift()
         if (!sym) break
         await processOneSymbol(sym)
+        processedByThisWorker++
+      }
+      if (processedByThisWorker > 0) {
+        console.log(`[v0] [ConfigSetProcessor] Worker ${workerId} processed ${processedByThisWorker} symbols`)
       }
     }
-    for (let i = 0; i < Math.min(SYMBOL_CONCURRENCY, symbols.length); i++) {
-      workers.push(spawnWorker())
+    const actualConcurrency = Math.min(SYMBOL_CONCURRENCY, symbols.length)
+    for (let i = 0; i < actualConcurrency; i++) {
+      workers.push(spawnWorker(i))
     }
     await Promise.all(workers)
+    console.log(`[v0] [ConfigSetProcessor] All ${actualConcurrency} workers completed`)
 
     const duration = Date.now() - startTime
     const result: ProcessingResult = {

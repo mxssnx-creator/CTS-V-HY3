@@ -1839,46 +1839,56 @@ export class TradeEngineManager {
     }
 
     const resolve = async (): Promise<string[]> => {
-      try {
-        // Fire both primary lookups concurrently so the first tick after TTL
-        // expiry doesn't pay two sequential Redis round-trips.
-        const [connState, connSettings] = await Promise.all([
-          getSettings(`trade_engine_state:${this.connectionId}`),
-          getSettings(`connection:${this.connectionId}`),
-        ])
+        try {
+          // Fire both primary lookups concurrently so the first tick after TTL
+          // expiry doesn't pay two sequential Redis round-trips.
+          const [connState, connSettings] = await Promise.all([
+            getSettings(`trade_engine_state:${this.connectionId}`),
+            getSettings(`connection:${this.connectionId}`),
+          ])
 
-        if (connState && typeof connState === "object") {
-          const connSymbols = (connState as any).symbols || (connState as any).active_symbols
-          if (Array.isArray(connSymbols) && connSymbols.length > 0) return connSymbols
-        }
-
-        if (connSettings && typeof connSettings === "object") {
-          const symbolsField = (connSettings as any).active_symbols || (connSettings as any).symbols
-          let symbols = symbolsField
-          if (typeof symbols === "string") {
-            try { symbols = JSON.parse(symbols) } catch { /* ignore */ }
+          if (connState && typeof connState === "object") {
+            const connSymbols = (connState as any).symbols || (connState as any).active_symbols
+            if (Array.isArray(connSymbols) && connSymbols.length > 0) {
+              console.log(`[v0] [Engine ${this.connectionId}] Symbols from trade_engine_state: ${connSymbols.join(", ")}`)
+              return connSymbols
+            }
           }
-          if (Array.isArray(symbols) && symbols.length > 0) return symbols
-        }
 
-        // Global main-symbols fallback — the UI stores these as fields on
-        // the canonical `app_settings` hash, never as standalone Redis
-        // keys, so `getSettings("useMainSymbols")` would always return
-        // null. Use the mirror-aware scalar reader (statically imported
-        // at the top of the module; avoids a `await import()` on this
-        // cycle-hot path).
-        const useMainSymbols = await getAppSetting<boolean>("useMainSymbols", false)
-        if (useMainSymbols === true) {
-          const mainSymbols = await getAppSetting<string[]>("mainSymbols", [])
-          if (Array.isArray(mainSymbols) && mainSymbols.length > 0) return mainSymbols
-        }
+          if (connSettings && typeof connSettings === "object") {
+            const symbolsField = (connSettings as any).active_symbols || (connSettings as any).symbols
+            let symbols = symbolsField
+            if (typeof symbols === "string") {
+              try { symbols = JSON.parse(symbols) } catch { /* ignore */ }
+            }
+            if (Array.isArray(symbols) && symbols.length > 0) {
+              console.log(`[v0] [Engine ${this.connectionId}] Symbols from connection settings: ${symbols.join(", ")}`)
+              return symbols
+            }
+          }
 
-        return ["DRIFTUSDT"]
-      } catch (error) {
-        console.error("[v0] Failed to get symbols, using fallback:", error instanceof Error ? error.message : String(error))
-        return ["DRIFTUSDT"]
+          // Global main-symbols fallback — the UI stores these as fields on
+          // the canonical `app_settings` hash, never as standalone Redis
+          // keys, so `getSettings("useMainSymbols")` would always return
+          // null. Use the mirror-aware scalar reader (statically imported
+          // at the top of the module; avoids a `await import()` on this
+          // cycle-hot path).
+          const useMainSymbols = await getAppSetting<boolean>("useMainSymbols", false)
+          if (useMainSymbols === true) {
+            const mainSymbols = await getAppSetting<string[]>("mainSymbols", [])
+            if (Array.isArray(mainSymbols) && mainSymbols.length > 0) {
+              console.log(`[v0] [Engine ${this.connectionId}] Symbols from mainSymbols: ${mainSymbols.join(", ")}`)
+              return mainSymbols
+            }
+          }
+
+          console.log(`[v0] [Engine ${this.connectionId}] Using fallback symbol: DRIFTUSDT`)
+          return ["DRIFTUSDT"]
+        } catch (error) {
+          console.error("[v0] Failed to get symbols, using fallback:", error instanceof Error ? error.message : String(error))
+          return ["DRIFTUSDT"]
+        }
       }
-    }
 
     const resolved = await resolve()
     this._symbolsCache = resolved
