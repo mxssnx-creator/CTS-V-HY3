@@ -172,7 +172,8 @@ async function savePosition(pos: LivePosition): Promise<void> {
     const openIndexKey   = `live:positions:${pos.connectionId}`
     const closedIndexKey = `live:positions:${pos.connectionId}:closed`
     const indexedMarker  = `live:positions:${pos.connectionId}:indexed:${pos.id}`
-    const directionKey   = `live:positions:${pos.connectionId}:direction:${pos.direction}`
+    // Per-symbol, per-setKey direction key for independent cap enforcement
+    const directionKey   = `live:positions:${pos.connectionId}:cap:${pos.symbol}:${pos.setKey}:${pos.direction}`
 
     // Track live positions per direction for cap enforcement
     const isActive = pos.status === "open" || pos.status === "placed" || pos.status === "partially_filled" || pos.status === "filled"
@@ -1017,11 +1018,12 @@ export async function executeLivePosition(
   const client = getRedisClient()
 
   // ── Per-Direction Cap Check for Live Positions ─────────────────────
-  // Live positions get a HIGHER cap (3x base sets count) compared to
-  // pseudo positions. This allows more live positions per direction.
+  // Cap is INDEPENDENT per (symbol, setKey, direction) combination.
+  // Each symbol + base set config + direction has its own separate cap.
   try {
     const maxLivePerDirection = await PseudoPositionManager.getMaxLivePositionsPerDirectionStatic(connectionId)
-    const directionKey = `live:positions:${connectionId}:direction:${realPosition.direction}`
+    // Key includes symbol and setKey to make cap independent for each
+    const directionKey = `live:positions:${connectionId}:cap:${realPosition.symbol}:${realPosition.setKey}:${realPosition.direction}`
     const currentCount = await client.scard(directionKey)
     if (Number(currentCount) >= maxLivePerDirection) {
       const rejected: LivePosition = {
@@ -1043,7 +1045,7 @@ export async function executeLivePosition(
         assignedStopLoss: realPosition.stopLoss,
         assignedTakeProfit: realPosition.takeProfit,
         status: "rejected",
-        statusReason: `Per-direction cap reached (${currentCount}/${maxLivePerDirection} for ${realPosition.direction})`,
+        statusReason: `Per-direction cap reached (${currentCount}/${maxLivePerDirection} for ${realPosition.symbol}:${realPosition.direction})`,
         fills: [],
         progression: [],
         createdAt: Date.now(),
