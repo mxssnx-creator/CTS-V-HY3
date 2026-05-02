@@ -522,14 +522,14 @@ export class StrategyCoordinator {
       // ── ACTIVE-NOW snapshot per (symbol, stage) ───────────────────────
       // The cumulative `strategies_base_total` hincrby above answers
       // "how many Base Sets have been created EVER", but the dashboard
-      // Overview asks "how many are alive RIGHT NOW for this symbol".
-      // We overwrite a single field per (symbol, stage) every cycle so
-      // the latest value is always the most recent count. The stats API
-      // hgetalls this hash and aggregates by stage.
+      // Per-set tracking: each setKey gets its own field for unique progression.
+      // This prevents different sets from overwriting each other's data.
+      const activeData: Record<string, string> = {}
+      for (const set of baseSets) {
+        activeData[set.setKey] = String(baseSets.length)
+      }
       writes.push(
-        client.hset(`strategies_active:${this.connectionId}`, {
-          [`${symbol}:base`]: String(baseSets.length),
-        }),
+        client.hset(`strategies_active:${this.connectionId}`, activeData),
         client.expire(`strategies_active:${this.connectionId}`, 600),
       )
       await Promise.all(writes)
