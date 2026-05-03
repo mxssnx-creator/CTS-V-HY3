@@ -3,6 +3,7 @@
 ## 2026-05-03 (Comprehensive Fixes - COMPLETE)
 - **ENVIRONMENT FIX**: Created `.env.local` from `.env.example` with secure random secrets (JWT_SECRET, SESSION_SECRET, ENCRYPTION_KEY, API_SIGNING_SECRET)
 - **DEV PREVIEW FIX**: Live Dev Preview now works - dev server starts successfully on port 3002 with 200 response
+- **PORT FIX**: Corrected hardcoded ports in API routes (3000/3001 -> 3002) to ensure internal HTTP calls work correctly
 - **BUILD VERIFIED**: `npm run build` succeeds with 169 pages generated
 - **TYPECHECK**: passes with 0 errors
 - **LINT**: passes with warnings only (no errors)
