@@ -173,10 +173,10 @@ export class StrategyCoordinator {
   }
 
   // Profit factor thresholds per stage
-  private readonly PF_BASE_MIN = 0.5    // Minimum to enter BASE set
-  private readonly PF_MAIN_MIN = 0.6    // Base sets must have avgPF >= 0.6 to enter MAIN
-  private readonly PF_REAL_MIN = 0.6    // Main sets must have avgPF >= 0.6 to enter REAL
-  private readonly PF_LIVE_MIN = 1.4    // Real sets must have avgPF >= 1.4 to enter LIVE
+  private readonly PF_BASE_MIN = 0.5    // Minimum for individual indications to enter BASE sets
+  private readonly PF_MAIN_MIN = 1.2    // Base sets must have avgPF >= 1.2 to enter MAIN (matches METRICS.main.minProfitFactor)
+  private readonly PF_REAL_MIN = 1.4    // Main sets must have avgPF >= 1.4 to enter REAL (matches METRICS.real.minProfitFactor)
+  private readonly PF_LIVE_MIN = 1.4    // Real sets must have avgPF >= 1.4 to enter LIVE (matches METRICS.live.minProfitFactor)
 
   // ── Filter axes (P0-2) ──────────────────────────────────────────────
   // Spec: *"filtering by Profitfactor Minimum, DrawdownTime Maximum"*.
