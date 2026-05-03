@@ -640,48 +640,59 @@ export class StrategyCoordinator {
         : activeVariants
 
       for (const profile of variantsForThisBase) {
-        const fingerprint = this.variantFingerprint(baseSet, profile.name, ctx)
+        // ── Axis Window Matrix Expansion ────────────────────────────────
+        // Spec: "additional related cnt Sets of > 1000 are created and async Calculated"
+        // Create sets for each combination of position count axes:
+        // - prev: 1-12 (previous position counts)
+        // - last: 1-4 (last position wins/losses magnitude)
+        // - cont: 1-8 (continuous positions, calculated after ongoing)
+        // - pause: 1-8 (pause positions, calculated after ongoing)
 
-        // Cache hit — reuse the cached Set verbatim. This is the "IF NOT
-        // ALREADY CREATED" path the user asked for.
-        if (fpCache[fingerprint]) {
-          try {
-            const cached = JSON.parse(fpCache[fingerprint]) as StrategySet
-            // Sanity-check the cached record before reusing it
-            if (cached && Array.isArray(cached.entries) && cached.entries.length > 0) {
-              // Re-attach the parent's trailing profile in case the cached
-              // payload was written before the profile field existed
-              // (operators upgrading mid-cycle keep working).
-              if (baseSet.trailingProfile && !cached.trailingProfile) {
-                cached.trailingProfile = baseSet.trailingProfile
+        const axisCombinations: Array<{ prev: number; last: number; cont: number; pause: number }> = []
+
+        // Generate all combinations of axis windows
+        for (let prev = 1; prev <= 12; prev++) {
+          for (let last = 1; last <= 4; last++) {
+            for (let cont = 1; cont <= 8; cont++) {
+              for (let pause = 1; pause <= 8; pause++) {
+                axisCombinations.push({ prev, last, cont, pause })
               }
-              mainSets.push(cached)
-              nextFpCache[fingerprint] = fpCache[fingerprint]
-              reused++
-              continue
             }
-          } catch { /* fall through — regenerate on parse failure */ }
+          }
         }
 
-        // Cache miss — build a fresh related Set from this profile.
-        // We thread `ctx` through so the freshly-built Set carries an
-        // accurate `axisWindows` snapshot (prev/last/cont/pause) for
-        // downstream stats dimensioning. Cached Sets keep the axis
-        // window from the cycle they were materialised in (this is the
-        // correct semantics — the gate that admitted them was based on
-        // *that* ctx, and we don't want to retroactively re-bucket).
-        const built = await this.buildVariantSet(baseSet, profile, metrics, maxEntries, ctx)
-        if (!built) continue
+        // Create a set for each axis combination
+        for (const axisWindow of axisCombinations) {
+          const fingerprint = this.variantFingerprint(baseSet, profile.name, ctx, axisWindow)
 
-        // Propagate Base's trailingProfile to the freshly-built Main Set
-        // so Real/Live can read it without traversing back to Base.
-        if (baseSet.trailingProfile) built.trailingProfile = baseSet.trailingProfile
+          // Cache hit — reuse the cached Set verbatim
+          if (fpCache[fingerprint]) {
+            try {
+              const cached = JSON.parse(fpCache[fingerprint]) as StrategySet
+              // Sanity-check the cached record before reusing it
+              if (cached && Array.isArray(cached.entries) && cached.entries.length > 0) {
+                // Re-attach the parent's trailing profile
+                if (baseSet.trailingProfile && !cached.trailingProfile) {
+                  cached.trailingProfile = baseSet.trailingProfile
+                }
+                mainSets.push(cached)
+                nextFpCache[fingerprint] = fpCache[fingerprint]
+                reused++
+                continue
+              }
+            } catch { /* fall through — regenerate on parse failure */ }
+          }
 
-        mainSets.push(built)
-        // Store a compact serialisation in the fingerprint cache. Capped at
-        // ~4KB per entry (the bulky `entries` array is already pruned to
-        // maxEntries upstream; we stringify the whole Set for fidelity).
-        nextFpCache[fingerprint] = JSON.stringify(built)
+          // Cache miss — build a fresh related Set for this axis combination
+          const built = await this.buildVariantSet(baseSet, profile, metrics, maxEntries, ctx, axisWindow)
+          if (!built) continue
+
+          // Propagate Base's trailingProfile to the freshly-built Main Set
+          if (baseSet.trailingProfile) built.trailingProfile = baseSet.trailingProfile
+
+          mainSets.push(built)
+          nextFpCache[fingerprint] = JSON.stringify(built)
+        }
       }
     }
 
@@ -1892,21 +1903,32 @@ export class StrategyCoordinator {
     baseSet: StrategySet,
     variant: "default" | "trailing" | "block" | "dca" | "pause",
     ctx: PositionContext,
+    axisWindow?: { prev: number; last: number; cont: number; pause: number },
   ): string {
     const bPF = Math.round(baseSet.avgProfitFactor * 10) / 10
     const bEC = baseSet.entryCount
-    // Clamp each context dimension to its spec maximum.
-    // cont is live-open by spec; the other four are closed-only via
-    // the P2-1 gate in getPositionContext. lastPosCount is the Pause
-    // variant's primary discriminator (1..8 windows) — adding it to the
-    // fingerprint guarantees a 3-loss / 5-loss / 8-loss pause produce
-    // distinct cached Sets instead of collapsing into the same bucket.
-    const cont = Math.min(10, Math.max(0, ctx.continuousCount))
-    const lW   = Math.min(4,  Math.max(0, ctx.lastWins))
-    const lL   = Math.min(4,  Math.max(0, ctx.lastLosses))
-    const lP   = Math.min(8,  Math.max(0, ctx.lastPosCount))
-    const pP   = Math.min(12, Math.max(0, ctx.prevPosCount))
-    const pL   = Math.min(12, Math.max(0, ctx.prevLosses))
+
+    // Use specific axis window values if provided, otherwise derive from context
+    let cont: number, lW: number, lL: number, lP: number, pP: number, pL: number
+
+    if (axisWindow) {
+      // Use the specific axis window values for this set
+      cont = axisWindow.cont
+      lW = axisWindow.last  // last represents the magnitude of wins/losses
+      lL = axisWindow.last
+      lP = axisWindow.pause
+      pP = axisWindow.prev
+      pL = axisWindow.prev  // prev represents previous position counts including losses
+    } else {
+      // Fallback to context-derived values for backward compatibility
+      cont = Math.min(10, Math.max(0, ctx.continuousCount))
+      lW   = Math.min(4,  Math.max(0, ctx.lastWins))
+      lL   = Math.min(4,  Math.max(0, ctx.lastLosses))
+      lP   = Math.min(8,  Math.max(0, ctx.lastPosCount))
+      pP   = Math.min(12, Math.max(0, ctx.prevPosCount))
+      pL   = Math.min(12, Math.max(0, ctx.prevLosses))
+    }
+
     const bCtx = `c${cont}/lw${lW}/ll${lL}/lp${lP}/pp${pP}/pl${pL}`
     return `${baseSet.setKey}#${variant}#pf=${bPF}#ec=${bEC}#ctx=${bCtx}`
   }
@@ -1929,6 +1951,7 @@ export class StrategyCoordinator {
     metrics: EvaluationMetrics,
     maxEntries: number,
     ctx?: PositionContext,
+    axisWindow?: { prev: number; last: number; cont: number; pause: number },
   ): Promise<StrategySet | null> {
     const entries: StrategySetEntry[] = []
     let idx = 0
@@ -1963,27 +1986,22 @@ export class StrategyCoordinator {
     const avgDDT = capped.reduce((s, e) => s + Number(e.drawdownTime  || 0), 0) / capped.length
 
     // ── Axis-window snapshot for this Set ───────────────────────────────
-    // Mirrors the spec's four position-count axes with the documented
-    // step-1 windows (see StrategySet.axisWindows). When ctx is absent
-    // (legacy diagnostic call paths) we emit zeros, signalling "no axis
-    // dimensioning available". The `last` axis encodes the *magnitude*
-    // of the most recent dimensional skew (max of wins or losses) so a
-    // single 0..4 figure suffices instead of two parallel counters.
-    const axisWindows = ctx
+    // Use specific axis window values if provided (for matrix expansion),
+    // otherwise derive from current context for backward compatibility.
+    const axisWindows = axisWindow || (ctx
       ? {
           prev:  Math.max(0, Math.min(12, ctx.prevPosCount)),
           last:  Math.max(0, Math.min(4,  Math.max(ctx.lastWins, ctx.lastLosses))),
           cont:  Math.max(0, Math.min(8,  ctx.continuousCount)),
           pause: Math.max(0, Math.min(8,  ctx.lastPosCount)),
         }
-      : { prev: 0, last: 0, cont: 0, pause: 0 }
+      : { prev: 0, last: 0, cont: 0, pause: 0 })
 
     return {
-      // Variant-scoped setKey — `direction:long#default`, `direction:long#block`, …
-      // This guarantees unique identity downstream so Real/Live treat each
-      // variant as a distinct Set while still letting consumers trace
-      // lineage via `parentSetKey`.
-      setKey:          `${baseSet.setKey}#${profile.name}`,
+      // Variant-scoped setKey with axis windows — `direction:long#default@p1l1c1p1`, `direction:long#block@p2l3c5p8`, …
+      // This guarantees unique identity for each axis combination downstream
+      // so Real/Live treat each position-scenario variant as a distinct Set.
+      setKey:          `${baseSet.setKey}#${profile.name}@p${axisWindows.prev}l${axisWindows.last}c${axisWindows.cont}p${axisWindows.pause}`,
       parentSetKey:    baseSet.setKey,
       variant:         profile.name,
       axisWindows,
