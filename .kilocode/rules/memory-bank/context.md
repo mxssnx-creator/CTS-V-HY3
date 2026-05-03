@@ -1,5 +1,14 @@
 # Context
 
+## 2026-05-03 (Port Fix for Live Preview - COMPLETE)
+- **LIVE PREVIEW FIX**: Updated dev server port from 3002 to 3000 to match sandbox environment expectations
+  - Changed `package.json` dev script: `next dev -p 3000`
+  - Changed start script: `next start -p 3000`
+  - Updated `.env.example` PORT=3000 and NEXT_PUBLIC_APP_URL=http://localhost:3000
+  - Sandbox now properly forwards requests from port 3000 to Next.js application
+- **TYPECHECK**: passes with 0 errors
+- **LINT**: passes with warnings only (no errors)
+
 ## 2026-05-03 (Comprehensive Fixes - COMPLETE)
 - **ENVIRONMENT FIX**: Created `.env.local` from `.env.example` with secure random secrets (JWT_SECRET, SESSION_SECRET, ENCRYPTION_KEY, API_SIGNING_SECRET)
 - **DEV PREVIEW FIX**: Live Dev Preview now works - dev server starts successfully on port 3002 with 200 response
