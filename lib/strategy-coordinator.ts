@@ -176,7 +176,7 @@ export class StrategyCoordinator {
   private readonly PF_BASE_MIN = 0.5    // Minimum for individual indications to enter BASE sets
   private readonly PF_MAIN_MIN = 0.6    // Base sets must have avgPF >= 0.6 to enter MAIN (matches METRICS.main.minProfitFactor)
   private readonly PF_REAL_MIN = 0.7    // Main sets must have avgPF >= 0.7 to enter REAL (matches METRICS.real.minProfitFactor)
-  private readonly PF_LIVE_MIN = 1.4    // Real sets must have avgPF >= 1.4 to enter LIVE (matches METRICS.live.minProfitFactor)
+  private readonly PF_LIVE_MIN = 0.7    // Real sets must have avgPF >= 0.7 to enter LIVE (matches METRICS.live.minProfitFactor)
 
   // ── Filter axes (P0-2) ──────────────────────────────────────────────
   // Spec: *"filtering by Profitfactor Minimum, DrawdownTime Maximum"*.
@@ -207,9 +207,9 @@ export class StrategyCoordinator {
     },
     live: {
       maxDrawdownTime: 120,   // 2 hours — realistic for current strategy output
-      minProfitFactor: 1.4,   // Match REAL stage minimum so Sets can flow through
+      minProfitFactor: 0.7,   // Match REAL stage minimum so Sets can flow through
       confidence: 0.65,       // advisory only
-      description: "Best 500 Sets from REAL (PF >= 1.4 + DDT <= 2h) ready for live trading",
+      description: "Best 500 Sets from REAL (PF >= 0.7 + DDT <= 2h) ready for live trading",
     },
   }
 
