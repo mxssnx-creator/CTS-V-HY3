@@ -173,7 +173,7 @@ export class StrategyCoordinator {
   }
 
   // Profit factor thresholds per stage
-  private readonly PF_BASE_MIN = 0.6    // Minimum to enter BASE set
+  private readonly PF_BASE_MIN = 0.5    // Minimum to enter BASE set
   private readonly PF_MAIN_MIN = 0.6    // Base sets must have avgPF >= 0.6 to enter MAIN
   private readonly PF_REAL_MIN = 0.6    // Main sets must have avgPF >= 0.6 to enter REAL
   private readonly PF_LIVE_MIN = 1.4    // Real sets must have avgPF >= 1.4 to enter LIVE
