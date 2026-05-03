@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getAllConnections, initRedis, updateConnection, setSettings, getSettings, getRedisClient,
-  buildMainConnectionEnableUpdate } from "@/lib/redis-db"
+  buildMainConnectionEnableUpdate, getConnection } from "@/lib/redis-db"
 import { API_VERSIONS } from "@/lib/system-version"
 import { logProgressionEvent, getProgressionLogs } from "@/lib/engine-progression-logs"
 import { createExchangeConnector } from "@/lib/exchange-connectors"
@@ -79,9 +79,14 @@ export async function POST(request: Request) {
     // selection from the Exchange context. Now we prefer the requested
     // connection when it exists and has credentials.
     const requestedConnectionId: string | undefined = body.connectionId
+    console.log(`${LOG_PREFIX}: Requested connectionId: ${requestedConnectionId}`)
+    console.log(`${LOG_PREFIX}: Available connections:`, allConnections.map(c => ({ id: c.id, name: c.name, exchange: c.exchange })))
+
     let connection: any = requestedConnectionId
       ? allConnections.find((c: any) => c.id === requestedConnectionId)
       : null
+
+    console.log(`${LOG_PREFIX}: Found requested connection:`, connection ? { id: connection.id, name: connection.name } : null)
 
     // Fall back to auto-discovery only if the requested connection is
     // missing or lacks credentials.
@@ -89,13 +94,22 @@ export async function POST(request: Request) {
         connection.api_key.length >= 10 && connection.api_secret.length >= 10)) {
       if (requestedConnectionId && connection) {
         console.log(`${LOG_PREFIX}: Requested connection ${requestedConnectionId} has no credentials — falling back to auto-discovery`)
+        console.log(`${LOG_PREFIX}: Connection details:`, {
+          hasApiKey: !!connection.api_key,
+          apiKeyLength: connection.api_key?.length || 0,
+          hasApiSecret: !!connection.api_secret,
+          apiSecretLength: connection.api_secret?.length || 0,
+        })
       } else if (requestedConnectionId) {
         console.log(`${LOG_PREFIX}: Requested connection ${requestedConnectionId} not found — falling back to auto-discovery`)
       }
+
+      console.log(`${LOG_PREFIX}: Starting auto-discovery...`)
       connection = allConnections.find((c: any) => {
       const exch = (c.exchange || "").toLowerCase()
       const hasCredentials = !!(c.api_key && c.api_secret && c.api_key.length >= 10 && c.api_secret.length >= 10)
       const isUserCreated = !(c.is_predefined === true || c.is_predefined === "1" || c.is_predefined === "true")
+      console.log(`${LOG_PREFIX}: Checking connection ${c.id} (${c.name}): exchange=${exch}, hasCredentials=${hasCredentials}, isUserCreated=${isUserCreated}`)
       return exch === "bingx" && isUserCreated && hasCredentials
     }) || allConnections.find((c: any) => {
       const exch = (c.exchange || "").toLowerCase()
@@ -302,26 +316,55 @@ export async function POST(request: Request) {
       count: symbols.length,
     })
     
-     // Step 3: QuickStart must assign + enable connection flow
-     console.log(`${LOG_PREFIX}: [3/4] Updating connection state...`)
-     
-     const updated = {
-       ...connection,
-       // Explicit quickstart assignment/enabling for engine processing
-       is_active_inserted: "1",
-       is_dashboard_inserted: "1",
-       is_enabled_dashboard: "1",
-       is_assigned: "1",
-       is_active: "1",
-       active_symbols: JSON.stringify(symbols),
-       last_test_status: testPassed ? "success" : "failed",
-       last_test_balance: testBalance,
-       last_test_at: new Date().toISOString(),
-       updated_at: new Date().toISOString(),
-     }
-     
-     await updateConnection(connectionId, updated)
-     console.log(`${LOG_PREFIX}: [3/4] Connection state updated (assigned+enabled for quickstart).`)
+    // Step 3: QuickStart must assign + enable connection flow
+    console.log(`${LOG_PREFIX}: [3/4] Updating connection state...`)
+
+    // Verify connection still exists before updating
+    const currentConnection = await getConnection(connectionId)
+    if (!currentConnection) {
+      throw new Error(`Connection ${connectionId} no longer exists - cannot update`)
+    }
+    console.log(`${LOG_PREFIX}: [3/4] Verified connection exists: ${currentConnection.name}`)
+
+    const updated = {
+      ...currentConnection,
+      // Explicit quickstart assignment/enabling for engine processing
+      is_active_inserted: "1",
+      is_dashboard_inserted: "1",
+      is_enabled_dashboard: "1",
+      is_assigned: "1",
+      is_active: "1",
+      active_symbols: JSON.stringify(symbols),
+      last_test_status: testPassed ? "success" : "failed",
+      last_test_balance: testBalance,
+      last_test_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    console.log(`${LOG_PREFIX}: [3/4] Updating connection ${connectionId} with:`, {
+      is_assigned: updated.is_assigned,
+      is_enabled_dashboard: updated.is_enabled_dashboard,
+      is_active_inserted: updated.is_active_inserted,
+      is_dashboard_inserted: updated.is_dashboard_inserted,
+      active_symbols: updated.active_symbols,
+      symbols_count: symbols.length,
+    })
+
+    try {
+      const result = await updateConnection(connectionId, updated)
+      if (!result) {
+        throw new Error(`updateConnection returned null - connection ${connectionId} may not exist`)
+      }
+      console.log(`${LOG_PREFIX}: [3/4] Connection state updated successfully. Result:`, {
+        id: result.id,
+        name: result.name,
+        is_assigned: result.is_assigned,
+        is_enabled_dashboard: result.is_enabled_dashboard,
+      })
+    } catch (updateError) {
+      console.error(`${LOG_PREFIX}: [3/4] FAILED to update connection:`, updateError)
+      throw new Error(`Connection update failed: ${updateError instanceof Error ? updateError.message : String(updateError)}`)
+    }
     
     // ALSO store in trade_engine_state for engine to find.
     // IMPORTANT: record the user-selected symbol count under
@@ -404,6 +447,8 @@ export async function POST(request: Request) {
       
       if (isAssigned && isMainEnabled) {
         console.log(`${LOG_PREFIX}: [4/4] Connection is explicitly enabled - initializing Main Engine...`)
+        console.log(`${LOG_PREFIX}: [4/4] Connection flags: isAssigned=${isAssigned}, isMainEnabled=${isMainEnabled}`)
+
         await setSettings(`engine_progression:${connectionId}`, {
           phase: "starting",
           progress: 15,
@@ -412,17 +457,29 @@ export async function POST(request: Request) {
           exchange: exchangeName,
           symbols,
           testPassed,
-          detail: testPassed 
+          detail: testPassed
             ? "Starting Main Trade Engine..."
             : `Connection test failed: ${testError}. Fix credentials and retry.`,
           updated_at: new Date().toISOString(),
         })
-        
+
         try {
+          console.log(`${LOG_PREFIX}: [4/4] Loading settings...`)
           const settings = await loadSettingsAsync()
+          console.log(`${LOG_PREFIX}: [4/4] Settings loaded:`, {
+            mainEngineIntervalMs: settings.mainEngineIntervalMs,
+            strategyUpdateIntervalMs: settings.strategyUpdateIntervalMs,
+            realtimeIntervalMs: settings.realtimeIntervalMs,
+          })
+
+          console.log(`${LOG_PREFIX}: [4/4] Getting global coordinator...`)
           const coordinator = getGlobalTradeEngineCoordinator()
-          
-          await coordinator.startEngine(connectionId, {
+          if (!coordinator) {
+            throw new Error("Global Trade Engine Coordinator not available")
+          }
+          console.log(`${LOG_PREFIX}: [4/4] Coordinator obtained, starting engine...`)
+
+          const engineConfig = {
             connectionId,
             connection_name: connection.name,
             exchange: exchangeName,
@@ -430,15 +487,20 @@ export async function POST(request: Request) {
             indicationInterval: settings.mainEngineIntervalMs ? settings.mainEngineIntervalMs / 1000 : 5,
             strategyInterval: settings.strategyUpdateIntervalMs ? settings.strategyUpdateIntervalMs / 1000 : 10,
             realtimeInterval: settings.realtimeIntervalMs ? settings.realtimeIntervalMs / 1000 : 3,
-          })
-          
+          }
+          console.log(`${LOG_PREFIX}: [4/4] Engine config:`, engineConfig)
+
+          await coordinator.startEngine(connectionId, engineConfig)
+          console.log(`${LOG_PREFIX}: [4/4] Engine start request completed`)
+
           // Ensure connection is marked as live trade enabled
+          console.log(`${LOG_PREFIX}: [4/4] Updating connection with live trade flag...`)
           await updateConnection(connectionId, {
             ...connection,
             is_live_trade: "1",
             updated_at: new Date().toISOString(),
           })
-          
+
           console.log(`${LOG_PREFIX} ✓ Main Engine started for ${connection.name}`)
           await logProgressionEvent(connectionId, "engine_started", "info", "Main Trade Engine started via QuickStart", {
             connectionId,
@@ -447,11 +509,22 @@ export async function POST(request: Request) {
             testPassed,
           })
         } catch (engineError) {
-          console.error(`${LOG_PREFIX} Failed to start engine:`, engineError)
+          console.error(`${LOG_PREFIX}: [4/4] Failed to start engine:`, engineError)
+          console.error(`${LOG_PREFIX}: [4/4] Error stack:`, engineError instanceof Error ? engineError.stack : 'No stack trace')
           await logProgressionEvent(connectionId, "engine_start_error", "error", "Failed to start engine", {
             error: engineError instanceof Error ? engineError.message : String(engineError),
+            stack: engineError instanceof Error ? engineError.stack : undefined,
           })
+          // Don't throw here - engine start failure shouldn't block the quickstart response
+          // The engine might still start later or the user can retry
         }
+      } else {
+        console.log(`${LOG_PREFIX}: [4/4] Connection not fully enabled - skipping engine start. Flags:`, {
+          isAssigned,
+          isMainEnabled,
+          is_assigned: updated.is_assigned,
+          is_enabled_dashboard: updated.is_enabled_dashboard,
+        })
       }
     
     // Store in global quickstart state
@@ -637,22 +710,24 @@ export async function POST(request: Request) {
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error)
     console.error(`${LOG_PREFIX}: FATAL ERROR:`, errorMsg)
-    
+    console.error(`${LOG_PREFIX}: Error stack:`, error instanceof Error ? error.stack : 'No stack trace')
+
     await logProgressionEvent("global", "quickstart_error", "error", "QuickStart failed with exception", {
       error: errorMsg,
+      stack: error instanceof Error ? error.stack : undefined,
       duration: Date.now() - startTime,
     })
-    
+
     const errorLogs = await getProgressionLogs("global")
-    
+
     return NextResponse.json(
-      { 
-        success: false, 
-        error: "Quick start failed", 
+      {
+        success: false,
+        error: "Quick start failed",
         details: errorMsg,
         logs: errorLogs,
         logsCount: errorLogs.length,
-        version: API_VERSION 
+        version: API_VERSION
       },
       { status: 500 }
     )
