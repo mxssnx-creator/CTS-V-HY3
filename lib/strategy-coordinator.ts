@@ -174,8 +174,8 @@ export class StrategyCoordinator {
 
   // Profit factor thresholds per stage
   private readonly PF_BASE_MIN = 0.5    // Minimum for individual indications to enter BASE sets
-  private readonly PF_MAIN_MIN = 1.2    // Base sets must have avgPF >= 1.2 to enter MAIN (matches METRICS.main.minProfitFactor)
-  private readonly PF_REAL_MIN = 1.4    // Main sets must have avgPF >= 1.4 to enter REAL (matches METRICS.real.minProfitFactor)
+  private readonly PF_MAIN_MIN = 0.6    // Base sets must have avgPF >= 0.6 to enter MAIN (matches METRICS.main.minProfitFactor)
+  private readonly PF_REAL_MIN = 0.7    // Main sets must have avgPF >= 0.7 to enter REAL (matches METRICS.real.minProfitFactor)
   private readonly PF_LIVE_MIN = 1.4    // Real sets must have avgPF >= 1.4 to enter LIVE (matches METRICS.live.minProfitFactor)
 
   // ── Filter axes (P0-2) ──────────────────────────────────────────────
@@ -195,15 +195,15 @@ export class StrategyCoordinator {
     },
     main: {
       maxDrawdownTime: 1440,  // 24 hours
-      minProfitFactor: 1.2,   // Base sets with avgPF >= 1.2 → promoted to MAIN
+      minProfitFactor: 0.6,   // Base sets with avgPF >= 0.6 → promoted to MAIN
       confidence: 0.5,        // advisory only
-      description: "Sets promoted from BASE with profitFactor >= 1.2 + DDT <= 24h",
+      description: "Sets promoted from BASE with profitFactor >= 0.6 + DDT <= 24h",
     },
     real: {
       maxDrawdownTime: 960,   // 16 hours
-      minProfitFactor: 1.4,   // Main sets with avgPF >= 1.4 → promoted to REAL
+      minProfitFactor: 0.7,   // Main sets with avgPF >= 0.7 → promoted to REAL
       confidence: 0.65,       // advisory only
-      description: "Sets promoted from MAIN with profitFactor >= 1.4 + DDT <= 16h",
+      description: "Sets promoted from MAIN with profitFactor >= 0.7 + DDT <= 16h",
     },
     live: {
       maxDrawdownTime: 120,   // 2 hours — realistic for current strategy output
