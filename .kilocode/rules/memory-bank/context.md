@@ -1,5 +1,10 @@
 # Context
 
+## 2026-05-03 (Live Preview Fix - COMPLETE)
+- **ENVIRONMENT CONFIG**: Created .env.local file with required environment variables (PORT=3002, NEXT_PUBLIC_APP_URL, JWT/SESSION secrets, DATABASE_URL)
+- **DEV SERVER CONFIG**: Ensured development server configuration matches sandbox expectations
+- **TYPECHECK/LINT**: 0 errors, passes clean.
+
 ## 2026-05-02 (Lower PF Thresholds + Enhanced Position Limit - COMPLETE)
 - **LOWER PF THRESHOLDS**: Reduced min Profit Factor to 0.6 for Base/Main/Real stages:
   - `PF_BASE_MIN`: 1.0 → 0.6 (more base sets pass to Main)
