@@ -16,6 +16,27 @@ export interface ConnectionSettings {
     leverage: number
     volumeMultiplier: number
   }
+
+  // Strategy stage settings
+  strategyStages: {
+    base: {
+      minProfitFactor: number
+      enabled: boolean
+    }
+    main: {
+      minProfitFactor: number
+      enabled: boolean
+    }
+    real: {
+      minProfitFactor: number
+      enabled: boolean
+    }
+    live: {
+      minProfitFactor: number
+      useRealValue: boolean  // Option to use same value as Real stage
+      enabled: boolean
+    }
+  }
   
   // Indication settings
   indication: {
@@ -66,6 +87,25 @@ const DEFAULT_SETTINGS: Omit<ConnectionSettings, "connectionId"> = {
     executionSpeed: "normal",
     useTrailingStop: true,
     enableAutoExit: false,
+  },
+  strategyStages: {
+    base: {
+      minProfitFactor: 0.5,
+      enabled: true,
+    },
+    main: {
+      minProfitFactor: 0.6,
+      enabled: true,
+    },
+    real: {
+      minProfitFactor: 0.7,
+      enabled: true,
+    },
+    live: {
+      minProfitFactor: 0.7,
+      useRealValue: true,  // Default to using Real value
+      enabled: true,
+    },
   },
 }
 

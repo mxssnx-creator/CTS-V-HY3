@@ -5,10 +5,10 @@
  * Flow:
  * 1. BASE: Create one strategy Set per (indication_type × direction) combination
  *          Each Set holds up to 250 config entries. Count = number of Sets.
- * 2. MAIN: Select Sets where avgProfitFactor >= 1.2 (from base).
+ * 2. MAIN: Select Sets where avgProfitFactor >= configurable threshold (from base).
  *          Expand each Set with position-size / leverage config variants.
  *          Max 250 entries per Set; rearrange by performance when over limit.
- * 3. REAL: Select Sets where avgProfitFactor >= 1.4 (from main).
+ * 3. REAL: Select Sets where avgProfitFactor >= configurable threshold (from main).
  *          Exchange-mirrored high-confidence strategies.
  * 4. LIVE: Select best 500 Sets (ranked by profitFactor) for real trading.
  *          One pseudo position per (indication_type, direction) Set.
@@ -17,6 +17,7 @@
  */
 
 import { initRedis, getSettings, setSettings, getRedisClient } from "@/lib/redis-db"
+import { getConnectionSettings } from "@/lib/connection-settings"
 import { logProgressionEvent } from "@/lib/engine-progression-logs"
 import { PositionThresholdManager } from "@/lib/position-threshold-manager"
 import { PseudoPositionManager } from "@/lib/trade-engine/pseudo-position-manager"
@@ -217,6 +218,41 @@ export class StrategyCoordinator {
     this.connectionId = connectionId
     if (config) {
       this.config = { ...this.config, ...config }
+    }
+  }
+
+  /**
+   * Get dynamic metrics based on connection settings
+   */
+  private async getDynamicMetrics(): Promise<Record<string, EvaluationMetrics>> {
+    const settings = await getConnectionSettings(this.connectionId)
+    const stages = settings.strategyStages
+
+    return {
+      base: {
+        maxDrawdownTime: 999999,
+        minProfitFactor: stages.base.minProfitFactor,
+        confidence: 0.3,  // advisory only
+        description: "One Set per (indication_type × direction) — all qualifying",
+      },
+      main: {
+        maxDrawdownTime: 1440,  // 24 hours
+        minProfitFactor: stages.main.minProfitFactor,
+        confidence: 0.5,        // advisory only
+        description: `Sets promoted from BASE with profitFactor >= ${stages.main.minProfitFactor} + DDT <= 24h`,
+      },
+      real: {
+        maxDrawdownTime: 960,   // 16 hours
+        minProfitFactor: stages.real.minProfitFactor,
+        confidence: 0.65,       // advisory only
+        description: `Sets promoted from MAIN with profitFactor >= ${stages.real.minProfitFactor} + DDT <= 16h`,
+      },
+      live: {
+        maxDrawdownTime: 120,   // 2 hours — realistic for current strategy output
+        minProfitFactor: stages.live.useRealValue ? stages.real.minProfitFactor : stages.live.minProfitFactor,
+        confidence: 0.65,       // advisory only
+        description: `Best 500 Sets from REAL (PF >= ${stages.live.useRealValue ? stages.real.minProfitFactor : stages.live.minProfitFactor} + DDT <= 2h) ready for live trading`,
+      },
     }
   }
 
@@ -597,7 +633,8 @@ export class StrategyCoordinator {
       baseSets = stored?.sets || []
     }
 
-    const metrics = this.METRICS.main
+    const dynamicMetrics = await this.getDynamicMetrics()
+    const metrics = dynamicMetrics.main
     const maxEntries = this.config.maxEntriesPerSet || 250
     const ctx = posCtx ?? this.neutralPositionContext()
     const mainSets: StrategySet[] = []
@@ -617,13 +654,14 @@ export class StrategyCoordinator {
     // ── 2. Variant profiles ─────────────────────────────────────────────
     const activeVariants = this.selectActiveVariants(ctx)
 
-    for (const baseSet of baseSets) {
-      // Base-level validation — P0-2: PF + DDT are the ONLY filter axes.
-      // Confidence is advisory metadata (used by Live stage's trailing-
-      // variant selector) and is NOT a gate here. A high-PF / low-DDT
-      // base Set with low confidence STILL promotes to Main for
-      // downstream variant expansion.
-      if (baseSet.avgProfitFactor < metrics.minProfitFactor) continue
+      for (const baseSet of baseSets) {
+        // Base-level validation — P0-2: PF + DDT are the ONLY filter axes.
+        // Confidence is advisory metadata (used by Live stage's trailing-
+        // variant selector) and is NOT a gate here. A high-PF / low-DDT
+        // base Set with low confidence STILL promotes to Main for
+        // downstream variant expansion.
+        const dynamicMetrics = await this.getDynamicMetrics()
+        if (baseSet.avgProfitFactor < dynamicMetrics.main.minProfitFactor) continue
       if (baseSet.avgDrawdownTime > metrics.maxDrawdownTime) continue
 
       // ── Multi-step trailing: collapse Main expansion to `default` ──
@@ -1010,7 +1048,8 @@ export class StrategyCoordinator {
     }
     const mainSets: StrategySet[] = inputSets ?? (stored?.sets || [])
 
-    const metrics = this.METRICS.real
+    const dynamicMetrics = await this.getDynamicMetrics()
+    const metrics = dynamicMetrics.real
 
     // P0-2: Real filter axes are PF-min + DDT-max ONLY. Confidence is
     // advisory metadata and is not part of the filter predicate.
@@ -1233,7 +1272,8 @@ export class StrategyCoordinator {
       realSets = stored?.sets || []
     }
 
-    const metrics = this.METRICS.live
+    const dynamicMetrics = await this.getDynamicMetrics()
+    const metrics = dynamicMetrics.live
     const maxLive = this.config.maxLiveSets || 500
 
     // P0-2: Live filter axes are PF-min + DDT-max ONLY (then rank by
