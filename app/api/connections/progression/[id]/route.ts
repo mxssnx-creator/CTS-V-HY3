@@ -133,9 +133,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     let phase = progression?.phase || "idle"
     let progress = Number(progression?.progress) || 0
     let detail = progression?.detail || "Not running"
-    
-    // Better phase detection based on actual metrics (most reliable)
-    if (indicationCycleCount > 100 || progressionState.cyclesCompleted > 100) {
+
+    // Prioritize stored progression phase from engine_progression:{id} (most reliable)
+    if (progression?.phase && progression?.phase !== "idle") {
+      phase = progression.phase
+      progress = Number(progression.progress) || 50
+      detail = progression.detail || "Engine running"
+
+      // Enhance detail with cycle information for active phases
+      if (phase === "live_trading" && (indicationCycleCount > 0 || progressionState.cyclesCompleted > 0)) {
+        const totalCycles = Math.max(indicationCycleCount, progressionState.cyclesCompleted)
+        detail = `Live trading active - ${totalCycles} cycles`
+      } else if (phase === "realtime" && (indicationCycleCount > 0 || progressionState.cyclesCompleted > 0)) {
+        const totalCycles = Math.max(indicationCycleCount, progressionState.cyclesCompleted)
+        detail = `Processing - ${totalCycles} cycles`
+      }
+    }
+    // Fallback to metric-based detection only when no stored phase exists
+    else if (indicationCycleCount > 100 || progressionState.cyclesCompleted > 100) {
       phase = "live_trading"
       progress = 100
       detail = `Live trading active - ${Math.max(indicationCycleCount, progressionState.cyclesCompleted)} cycles`
@@ -148,10 +163,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       phase = "realtime"
       progress = 80 + Math.min(20, totalCycles / 10)
       detail = `Processing - ${totalCycles} cycles`
-    } else if (progression?.phase && !["ready", "idle", "initializing"].includes(progression.phase)) {
-      phase = progression.phase
-      progress = Number(progression.progress) || 50
-      detail = progression.detail || "Engine running"
     } else if (engineState?.all_phases_started || engineState?.live_trading_started) {
       phase = "live_trading"
       progress = 100

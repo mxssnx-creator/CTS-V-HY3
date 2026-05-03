@@ -67,7 +67,7 @@ export async function GET(
     }
 
     // Get progression data
-    const progressionKey = `settings:engine_progression:${connectionId}`
+    const progressionKey = `engine_progression:${connectionId}`
     const progression = await getSettings(progressionKey) || {}
 
     // Get trading metrics

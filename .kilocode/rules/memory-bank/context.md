@@ -20,6 +20,13 @@
 - **IMPACT**: Dashboard will now show correct final strategy counts instead of attempted counts
 - **VERIFICATION**: Typecheck and lint pass, counters now reflect actual completed evaluations
 
+## 2026-05-03 (Progressions System Comprehensive Fixes - COMPLETE)
+- **PHASE DETECTION FIX**: Fixed progression phase detection logic to prioritize stored engine_progression phase over metric-based detection
+- **REDIS KEY FIX**: Fixed incorrect Redis key `settings:engine_progression:${connectionId}` to `engine_progression:${connectionId}` in statistics API
+- **PHASE LOGIC IMPROVEMENT**: Enhanced phase detection to use stored phase as primary source with cycle information enhancement for active phases
+- **COMPREHENSIVE VERIFICATION**: All progression components verified working - API endpoints, state manager, logging, phase transitions, and Redis key consistency
+- **SYSTEM INTEGRITY**: Progression system now correctly tracks phases, counters, logs, and provides accurate status to dashboard
+
 ## 2026-05-02 (Lower PF Thresholds + Enhanced Position Limit - COMPLETE)
 - **LOWER PF THRESHOLDS**: Reduced min Profit Factor to 0.6 for Base/Main/Real stages:
   - `PF_BASE_MIN`: 1.0 → 0.6 (more base sets pass to Main)
