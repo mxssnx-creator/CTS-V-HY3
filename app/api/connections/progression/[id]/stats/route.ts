@@ -776,7 +776,7 @@ export async function GET(
     // and is shown separately in the breakdown; it is NOT part of the total.
     // Fall back to `strategies_count` (which is written with the same
     // pipeline-aware semantic by the engine & cron) if Real is zero.
-    const stratTotal = stratCounts.real || strategiesTotal
+    const stratTotal = stratEvaluated.real || strategiesTotal
 
     // ── STRATEGY VARIANT breakdown ───────────────────────────────────────────
     // The Main stage expands each promoted Base Set into position-variant
