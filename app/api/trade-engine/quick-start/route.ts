@@ -266,7 +266,7 @@ export async function POST(request: Request) {
     // PRIMARY: fetch most volatile symbol from public exchange API (no auth required)
     if (symbols.length === 0) {
       try {
-        const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+        const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3002"
         const topRes = await fetch(
           `${baseUrl}/api/exchange/${exchangeName}/top-symbols?t=${Date.now()}`,
           { signal: AbortSignal.timeout(5000), cache: "no-store" }
